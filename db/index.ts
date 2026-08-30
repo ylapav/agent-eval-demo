@@ -28,25 +28,98 @@ import * as schema from "./schema";
  */
 export type DbMode = "pglite" | "neon" | "postgres";
 
-const url = process.env.DATABASE_URL?.trim();
+const HYVAKSYTYT =
+  'tyhjä (PGlite hakemistoon .data/pg) | "pglite:<hakemisto>" | "pglite:memory://" | "postgres://…" | "postgresql://…"';
 
-export const DB_MODE: DbMode =
-  !url || url.startsWith("pglite:")
-    ? "pglite"
-    : /\.neon\.tech(:|\/|$)/.test(url)
-      ? "neon"
-      : "postgres";
+type Resolved = {
+  mode: DbMode;
+  /** Lokiin kelpaava tunniste: isäntänimi tai hakemisto. Ei koskaan tunnuksia. */
+  label: string;
+  /** PGliten kohde: hakemisto tai "memory://". */
+  pgliteTarget: string;
+};
+
+/**
+ * DATABASE_URL → ajuri, tai poikkeus.
+ *
+ * Aiemmin tuntematon muoto putosi hiljaa postgres-haaraan. Se on täsmälleen
+ * se virheluokka, jota tämä repo muuten käsittelee: väärä valinta ilman
+ * virhettä, oire vasta myöhemmin ja väärässä paikassa. Kirjoitusvirhe
+ * Neonin osoitteessa olisi tarkoittanut yhteysyritystä väärään paikkaan
+ * ja virheilmoitusta, joka puhuu verkosta eikä konfiguraatiosta.
+ *
+ * Tuntematon muoto kaataa käynnistyksen. Se on ainoa hetki, jolloin
+ * korjaaminen on halpaa.
+ */
+function resolveUrl(raw: string | undefined): Resolved {
+  const url = raw?.trim();
+
+  if (!url) return { mode: "pglite", label: ".data/pg", pgliteTarget: ".data/pg" };
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    // Arvoa ei toisteta virheeseen: väärin kirjoitettukin URL voi sisältää
+    // salasanan, ja virheilmoitukset päätyvät lokeihin ja tikettijärjestelmiin.
+    throw new Error(
+      `DATABASE_URL ei ole kelvollinen URL. Arvoa ei tulosteta, koska se voi sisältää tunnuksia. Hyväksytyt muodot: ${HYVAKSYTYT}`,
+    );
+  }
+
+  if (parsed.protocol === "pglite:") {
+    const target = url.slice("pglite:".length) || ".data/pg";
+    const memory = target === "memory://" || target === "memory:";
+    return {
+      mode: "pglite",
+      label: memory ? "in-memory" : target,
+      pgliteTarget: memory ? "memory://" : target,
+    };
+  }
+
+  if (parsed.protocol === "postgres:" || parsed.protocol === "postgresql:") {
+    if (!parsed.hostname) {
+      throw new Error(
+        `DATABASE_URL:sta puuttuu isäntänimi. Hyväksytyt muodot: ${HYVAKSYTYT}`,
+      );
+    }
+    // Neon tunnistetaan isäntänimen loppuliitteestä, ei osajonosta:
+    // "evil.neon.tech.example.com" ei ole Neon.
+    const neonHost = /(^|\.)neon\.tech$/i.test(parsed.hostname);
+    return {
+      mode: neonHost ? "neon" : "postgres",
+      label: parsed.hostname,
+      pgliteTarget: ".data/pg",
+    };
+  }
+
+  throw new Error(
+    `DATABASE_URL:n protokolla "${parsed.protocol}" ei ole tuettu. Hyväksytyt muodot: ${HYVAKSYTYT}`,
+  );
+}
+
+const resolved = resolveUrl(process.env.DATABASE_URL);
+
+export const DB_MODE: DbMode = resolved.mode;
 
 /** PGliten datahakemisto. Poista se, jos haluat aloittaa puhtaalta pöydältä. */
-export const PGLITE_DIR =
-  url?.startsWith("pglite:") ? url.slice("pglite:".length) || ".data/pg" : ".data/pg";
+export const PGLITE_DIR = resolved.pgliteTarget;
+
+/**
+ * Yksi rivi käynnistyksessä. Ilman sitä ainoa tapa tietää mihin kantaan
+ * sovellus puhuu on päätellä se ympäristömuuttujasta, jota ei näe ajon
+ * aikana. Isäntänimi riittää tunnistamiseen; käyttäjätunnus, salasana ja
+ * kyselyparametrit eivät kuulu lokiin.
+ */
+console.log(`[db] driver=${resolved.mode} url=${resolved.label}`);
 
 function build() {
-  if (DB_MODE === "neon") return drizzleNeon(neon(url!), { schema });
-  if (DB_MODE === "postgres") return drizzlePostgres(postgres(url!, { max: 1 }), { schema });
+  if (DB_MODE === "neon") return drizzleNeon(neon(process.env.DATABASE_URL!), { schema });
+  if (DB_MODE === "postgres")
+    return drizzlePostgres(postgres(process.env.DATABASE_URL!, { max: 1 }), { schema });
   // PGliten oma mkdir ei ole rekursiivinen: se olettaa että .data on jo
   // olemassa ja kaatuu muuten ENOENTiin, joka näyttää laajennusvirheeltä.
-  mkdirSync(PGLITE_DIR, { recursive: true });
+  if (PGLITE_DIR !== "memory://") mkdirSync(PGLITE_DIR, { recursive: true });
   return drizzlePglite(new PGlite(PGLITE_DIR, { extensions: { vector } }), { schema });
 }
 
