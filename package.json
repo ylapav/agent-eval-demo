@@ -25,6 +25,7 @@
     "db:push": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed-products.ts",
     "embed": "tsx scripts/embed-content.ts",
+    "record": "tsx scripts/record.ts",
     "index": "tsx lib/rag/index-content.ts",
     "setup": "npm run db:push && npm run db:seed && npm run index",
     "eval": "tsx lib/eval/run.ts",
