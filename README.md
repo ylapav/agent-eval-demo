@@ -341,7 +341,7 @@ Korjaus on `loadWriteCount` tiedostossa [lib/agent/guards.ts](lib/agent/guards.t
 määrä luetaan kannasta, koska serverless-ajossa prosessimuisti ei ole edes sama
 kahden pyynnön välillä. Korjaus on tämän repon ensimmäisessä commitissa, joten
 siitä ei ole omaa diffiä nähtäväksi. Sama virheluokka löytyi kuitenkin uudelleen
-myöhemmin ja siitä on: commit `a34f4b4`, jossa vahvistusportti osoittautui
+myöhemmin ja siitä on: commit `6709f6b`, jossa vahvistusportti osoittautui
 laskevan vuoroja mutta ei sitä, tapahtuiko niissä mitään.
 
 ## Mitä tekisin seuraavaksi
