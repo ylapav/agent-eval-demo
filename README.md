@@ -291,12 +291,35 @@ kohdassa [Tulokset](#tulokset); tässä on menetelmä.
 
 
 
-**Lähdeperusteisuus** arvioidaan toisella, pienemmällä mallilla, joka saa
-vastauksen ja lähdekatkelmat ja palauttaa per väite kyllä/ei. Arvioija ei näe
-kysymystä eikä sitä, mikä malli vastauksen tuotti. Jos se näkisi kysymyksen, se
-alkaisi arvioida vastaako teksti kysymykseen — se on eri mittari, ja se on jo
-olemassa. Arvioijan on oltava eri malli kuin agentin, koska sama malli palkitsisi
-omaa tyyliään.
+**Lähdeperusteisuus** arvioidaan toisella mallilla, joka saa vastauksen ja
+lähdekatkelmat ja palauttaa per väite kyllä/ei. Arvioija ei näe kysymystä eikä
+sitä, mikä malli vastauksen tuotti. Jos se näkisi kysymyksen, se alkaisi
+arvioida vastaako teksti kysymykseen — se on eri mittari, ja se on jo olemassa.
+
+### Arvioijan riippumattomuus
+
+Agentti on Anthropic, arvioija on OpenAI. Se ei ole makuasia vaan mittarin
+edellytys: **saman perheen mallit jakavat koulutusdatan ja tyylitaipumukset**,
+joten ne palkitsevat juuri niitä muotoiluja joita agentti tuottaa. Jos agentti
+kirjoittaa "Lähde: Takuuehdot" ja arvioija on koulutettu pitämään sitä
+lähdeviittauksen merkkinä, lähdeperusteisuusluku mittaa osittain itseään.
+Ajaja **kieltäytyy** ja poistuu koodilla 2, jos agentin ja arvioijan toimittaja
+on sama — ei varoitusta, koska varoituksen kanssa luvut syntyisivät ja
+päätyisivät tähän taulukkoon, ja niiden vinouma olisi jälkikäteen näkymätön.
+
+**Mitä se ei ratkaise.** Toimittajaraja pienentää ongelmaa, ei poista sitä.
+Molemmat mallit on koulutettu osin samalla julkisella verkkotekstillä, joten ne
+jakavat käsityksen siitä miltä uskottava vastaus näyttää. Arvioija on yhä
+kielimalli, joka voi erehtyä samaan suuntaan kuin agentti. Ainoa tapa mitata sitä
+olisi ihmisen tekemä otos samoista tapauksista — sitä ei ole tehty, ja siksi
+lähdeperusteisuusluku on suuntaa antava eikä absoluuttinen.
+
+Arvioijaksi on valittu **halvin malli joka selviää tehtävästä**, ja se on väite
+jolla on todiste: `npm run judge:check` ajaa viisi käsin tehtyä
+vastaus–katkelma-paria, joissa oikea tuomio tiedetään — täysin tuettu, keksitty
+luku, yleisesti tosi mutta ei katkelmissa, ei väitteitä lainkaan, ja sekoitus.
+Jos arvioija erehtyy niissä, se vaihdetaan isompaan ennen sarjan ajoa.
+Arvioijan virhe ei näy mittarissa virheenä vaan lukuna, joka näyttää oikealta.
 
 **Työkaluvalinta** mittaa myös kutsumatta jättämistä. Kaksi tapausta on
 tarkoituksella sellaisia, joissa oikea vastaus on olla kutsumatta mitään

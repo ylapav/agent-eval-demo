@@ -9,7 +9,8 @@ import { runAgent, MODEL_ID, EFFORT } from "@/lib/agent/loop";
 import { PROMPT_HASH } from "@/lib/agent/prompt";
 import { EMBED_MODEL } from "@/lib/rag/embed";
 import { SEARCH_MODE, RELEVANCE_FLOOR } from "@/lib/rag/search";
-import { scoreGroundedness, JUDGE_MODEL } from "./groundedness";
+import { scoreGroundedness, JUDGE_MODEL, JUDGE_PROVIDER } from "./groundedness";
+import { specFor } from "@/lib/agent/models";
 import { THRESHOLDS } from "./thresholds";
 import { writeReadmeResults } from "./report";
 
@@ -55,6 +56,8 @@ const load = (f: string): Case[] =>
   (JSON.parse(readFileSync(join(process.cwd(), "eval-sets", f), "utf8")) as Case[]).filter(
     (c) => c.viesti,
   );
+
+const NL = String.fromCharCode(10);
 
 const sid = (suite: string, id: string) => `eval-${suite}-${id}-${Date.now()}`;
 
@@ -389,8 +392,37 @@ async function main() {
     process.exit(2);
   }
 
+  // Arvioija ei saa olla samalta toimittajalta kuin agentti.
+  //
+  // Kieltäytyminen eikä varoitus: varoituksen kanssa luvut syntyisivät ja
+  // päätyisivät README:hen, ja niiden vinouma olisi näkymätön jälkikäteen.
+  // Saman perheen malli palkitsee juuri niitä muotoiluja joita agentti
+  // tuottaa, joten mittari mittaisi osittain itseään.
+  const agentProvider = specFor(MODEL_ID).provider;
+  const juryProvider = specFor(JUDGE_MODEL).provider;
+  if (agentProvider === juryProvider) {
+    console.error(
+      [
+        "",
+        "Evaluointia ei ajeta: agentti ja arvioija ovat samalta toimittajalta.",
+        "",
+        `  agentti:  ${MODEL_ID} (${agentProvider})`,
+        `  arvioija: ${JUDGE_MODEL} (${juryProvider})`,
+        "",
+        "Saman perheen malli jakaa koulutusdatan ja tyylitaipumukset agentin",
+        "kanssa: se palkitsee juuri niitä muotoiluja joita agentti tuottaa.",
+        "Lähdeperusteisuusluku mittaisi silloin osittain itseään.",
+        "",
+        "Aseta JUDGE_PROVIDER ja JUDGE_MODEL eri toimittajalle. Oletus on",
+        "openai / gpt-5-nano; katso .env.example.",
+        "",
+      ].join(NL),
+    );
+    process.exit(2);
+  }
+
   console.log(`malli:     ${MODEL_ID} (effort ${EFFORT})`);
-  console.log(`arvioija:  ${JUDGE_MODEL}`);
+  console.log(`arvioija:  ${JUDGE_MODEL} (${JUDGE_PROVIDER})`);
   console.log(`upotus:    ${EMBED_MODEL} (haku ${SEARCH_MODE}, kynnys ${RELEVANCE_FLOOR})`);
   console.log(`kehote:    ${PROMPT_HASH}\n`);
 

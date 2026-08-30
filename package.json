@@ -29,6 +29,7 @@
     "index": "tsx lib/rag/index-content.ts",
     "setup": "npm run db:push && npm run db:seed && npm run index",
     "eval": "tsx lib/eval/run.ts",
+    "judge:check": "tsx scripts/judge-check.ts",
     "calibrate": "tsx scripts/calibrate-floor.ts"
   },
   "dependencies": {

@@ -1,9 +1,20 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { callJudge, JUDGE_MODEL, JUDGE_PROVIDER } from "./judge-client";
 
-const anthropic = new Anthropic();
+export { JUDGE_MODEL, JUDGE_PROVIDER };
 
-/** Arvioija on eri malli kuin agentti. Sama malli arvioisi omaa tyyliään. */
-export const JUDGE_MODEL = process.env.JUDGE_MODEL ?? "claude-haiku-4-5";
+/**
+ * Arvioija on eri TOIMITTAJA kuin agentti.
+ *
+ * Sama malli arvioisi omaa tyyliään, mutta ongelma ei rajoitu samaan
+ * malliin: saman perheen mallit jakavat koulutusdatan ja tyylitaipumukset,
+ * joten ne palkitsevat juuri niitä muotoiluja joita agentti tuottaa.
+ * Toimittajaraja ei poista ongelmaa — molemmat on koulutettu osin samalla
+ * julkisella verkkotekstillä — mutta pienentää sitä olennaisesti.
+ *
+ * Yhteys on lib/eval/judge-client.ts:ssä. Tämä tiedosto omistaa kehotteen
+ * ja tulkinnan, eli mittarin määritelmän, eikä se saa muuttua toimittajan
+ * mukana.
+ */
 
 const JUDGE_PROMPT = `Saat vastauksen ja joukon lähdekatkelmia.
 
@@ -38,22 +49,12 @@ export async function scoreGroundedness(
   answer: string,
   chunks: string[],
 ): Promise<GroundednessResult> {
-  const res = await anthropic.messages.create({
-    model: JUDGE_MODEL,
-    max_tokens: 1000,
-    system: JUDGE_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `LÄHDEKATKELMAT:\n${chunks.map((c, i) => `[${i + 1}] ${c}`).join("\n\n")}\n\nVASTAUS:\n${answer}`,
-      },
-    ],
-  });
-
-  const raw = res.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("")
+  const raw = (
+    await callJudge(
+      JUDGE_PROMPT,
+      `LÄHDEKATKELMAT:\n${chunks.map((c, i) => `[${i + 1}] ${c}`).join("\n\n")}\n\nVASTAUS:\n${answer}`,
+    )
+  )
     .replace(/```json|```/g, "")
     .trim();
 
