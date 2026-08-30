@@ -1,15 +1,55 @@
 # Nordkanta-agentti
 
-Tuotantomainen asiakaspalveluagentti kuvitteelliselle rakennustarvikevalmistajalle.
-Rakennettu työnäytteeksi. Nordkanta Oy ei ole olemassa, ja koko tietopohja on
-generoitu.
+Ajettavissa ilman yhtäkään API-avainta:
 
-Demossa on kolme osaa: agenttisilmukka neljällä työkalulla, turvakerros
-kirjoittaville operaatioille, ja evaluointikerros joka mittaa milloin agentti oli
-väärässä.
+```bash
+npm install && npm run setup && npm run dev
+```
 
-Kolmas osa on syy miksi tämä on olemassa. Agentin rakentaminen on suoraviivaista.
-Sen tietäminen, milloin se epäonnistuu hiljaa, ei ole.
+Suomenkielinen asiakaspalveluagentti kuvitteelliselle
+rakennustarvikevalmistajalle: se vastaa takuu- ja toimitusehdoista
+vektorihaulla, hakee hinnat ja saatavuudet tuotetaulusta, varaa soittopyyntöjä
+ja luo tikettejä. Kirjoittavilla operaatioilla on rakenteelliset rajat koodissa
+eikä kehotteessa, ja mukana on evaluointikerros, joka mittaa milloin agentti oli
+väärässä. Nordkanta Oy ei ole olemassa ja koko tietopohja on generoitu.
+
+## Tulokset
+
+Neljä mittaria. **Kynnykset lukittiin ennen ensimmäistä ajoa** tiedostoon
+`lib/eval/thresholds.ts` ja versionhallintaan. Jos kynnykset asettaa tulosten
+näkemisen jälkeen, ne asettuvat aina juuri sen alle mitä järjestelmä sattui
+saamaan, ja mittari lakkaa mittaamasta mitään.
+
+<!-- EVAL:ALKU -->
+
+| Mittari | Kynnys | Tulos | Tila |
+|---|---|---|---|
+| Lähdeperusteisuus | ≥ 90 % | ei ajettu | odottaa avaimia |
+| Työkaluvalinta | ≥ 90 % | ei ajettu | odottaa avaimia |
+| Injektiovuodot | = 0 | ei ajettu | odottaa avaimia |
+| Keksimisprosentti | ≤ 5 % | ei ajettu | odottaa avaimia |
+
+**Näitä lukuja ei ole mitattu.** Evaluointi vaatii `ANTHROPIC_API_KEY`:n ja
+`VOYAGE_API_KEY`:n, eikä ajoa ole tehty. Taulukko on tässä muodossa siksi, että
+tyhjä taulukko on rehellisempi kuin arvattu — ja siksi, että ero näkyy heti:
+kynnykset ovat lukittuja lukuja koodissa, tulossarake on mittausta odottava.
+
+Täyttyy yhdellä komennolla:
+
+```bash
+npm run eval
+```
+
+Ajaja kirjoittaa tulokset tähän kohtaan automaattisesti (`lib/eval/report.ts`)
+malli-ID:n ja kehotehashin kanssa, ja tapauskohtaiset tulokset tiedostoon
+`eval-results.json`. Taulukkoa ei täytetä käsin: käsin täytetty tulostaulukko on
+käsin valittu tulostaulukko. Kun luvut kopioidaan terminaalista, alitus jää
+helposti kopioimatta — ei valehtelemisen takia vaan siksi, että sen
+kirjoittaminen tuntuu keskeneräiseltä.
+
+<!-- EVAL:LOPPU -->
+
+Menetelmä on kuvattu kohdassa [Evaluointi](#evaluointi).
 
 ## Pino
 
@@ -22,21 +62,22 @@ tuotannossa. Neonin URL vaihtaa ajurin, koodi ei muutu.
 
 ## Käynnistys
 
-Paikallisesti, ilman Dockeria ja ilman pilvitiliä:
+Ylimmän komennon jälkeen chat on osoitteessa `/` ja admin-näkymä `/admin`
+(vaatii `ADMIN_PASSWORD`). Ei Dockeria, ei pilvitiliä: `npm run setup` ajaa
+migraatiot, tuotedatan ja tietopohjan indeksoinnin PGliteen.
+
+Mitä ilman avaimia toimii: rakenne, migraatiot, indeksointi, pgvector-haku,
+hakukynnys, työkalukutsujen validointi ja koko turvakerros testeineen. Mitä ei:
+agentti ei vastaa ilman `ANTHROPIC_API_KEY`:tä, ja upotukset korvautuvat
+paikallisella tiivistefunktiolla — evaluointi kieltäytyy ajamasta sen päällä.
+Siitä lisää kohdassa [Valeupotus](#valeupotus).
+
+Avaimet mukaan:
 
 ```bash
 cp .env.example .env.local     # täytä ANTHROPIC_API_KEY ja VOYAGE_API_KEY
-npm install
-npm run setup                  # migraatiot + tuotedata + tietopohjan indeksointi
-npm run dev
+npm run index                  # indeksoi tietopohja oikeilla upotuksilla
 ```
-
-Chat on osoitteessa `/`, admin-näkymä `/admin` (vaatii `ADMIN_PASSWORD`).
-
-Ilman API-avaimia rakenne, migraatiot, indeksointi ja vektorihaku toimivat —
-upotukset korvautuu paikallisella tiivistefunktiolla. Agentti itse ei vastaa
-ilman `ANTHROPIC_API_KEY`:tä, ja evaluointi kieltäytyy ajamasta valeupotuksen
-päällä. Siitä lisää kohdassa [Valeupotus](#valeupotus).
 
 ```bash
 npm test                       # turvakerroksen yksikkötestit, ei avaimia eikä kantaa
@@ -153,39 +194,11 @@ selvittelyn joita ei tapahtunut.
 
 ## Evaluointi
 
-Neljä mittaria. **Kynnykset lukittiin ennen ensimmäistä ajoa** tiedostoon
-`lib/eval/thresholds.ts`. Jos kynnykset asettaa tulosten näkemisen jälkeen, ne
-asettuvat aina juuri sen alle mitä järjestelmä sattui saamaan, ja mittari lakkaa
-mittaamasta mitään.
+Tämä on syy miksi repo on olemassa. Agentin rakentaminen on suoraviivaista; sen
+tietäminen, milloin se epäonnistuu hiljaa, ei ole. Tulokset ovat ylhäällä
+kohdassa [Tulokset](#tulokset); tässä on menetelmä.
 
-<!-- EVAL:ALKU -->
 
-| Mittari | Kynnys | Tulos | Tila |
-|---|---|---|---|
-| Lähdeperusteisuus | ≥ 90 % | ei ajettu | odottaa avaimia |
-| Työkaluvalinta | ≥ 90 % | ei ajettu | odottaa avaimia |
-| Injektiovuodot | = 0 | ei ajettu | odottaa avaimia |
-| Keksimisprosentti | ≤ 5 % | ei ajettu | odottaa avaimia |
-
-**Näitä lukuja ei ole mitattu.** Evaluointi vaatii `ANTHROPIC_API_KEY`:n ja
-`VOYAGE_API_KEY`:n, eikä ajoa ole tehty. Taulukko on tässä muodossa siksi, että
-tyhjä taulukko on rehellisempi kuin arvattu — ja siksi, että ero näkyy heti:
-kynnykset ovat lukittuja lukuja koodissa, tulossarake on mittausta odottava.
-
-Täyttyy yhdellä komennolla:
-
-```bash
-npm run eval
-```
-
-Ajaja kirjoittaa tulokset tähän kohtaan automaattisesti (`lib/eval/report.ts`)
-malli-ID:n ja kehotehashin kanssa, ja tapauskohtaiset tulokset tiedostoon
-`eval-results.json`. Taulukkoa ei täytetä käsin: käsin täytetty tulostaulukko on
-käsin valittu tulostaulukko. Kun luvut kopioidaan terminaalista, alitus jää
-helposti kopioimatta — ei valehtelemisen takia vaan siksi, että sen
-kirjoittaminen tuntuu keskeneräiseltä.
-
-<!-- EVAL:LOPPU -->
 
 **Lähdeperusteisuus** arvioidaan toisella, pienemmällä mallilla, joka saa
 vastauksen ja lähdekatkelmat ja palauttaa per väite kyllä/ei. Arvioija ei näe

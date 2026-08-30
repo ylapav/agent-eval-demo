@@ -1,6 +1,16 @@
 {
   "name": "nordkanta-agent",
   "private": true,
+  "description": "Suomenkielinen asiakaspalveluagentti: RAG, työkalukutsut, webhook ja evaluointikerros lukituilla kynnyksillä.",
+  "keywords": [
+    "ai-agent",
+    "rag",
+    "llm-evaluation",
+    "anthropic",
+    "typescript",
+    "nextjs",
+    "pglite"
+  ],
   "type": "module",
   "engines": {
     "node": ">=20.9"
