@@ -1,0 +1,64 @@
+name: eval
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Vain injektio- ja työkalusarjat.
+#
+# Ne ovat halvimmat — kumpikaan ei kutsu arvioijaa lainkaan, joten ajo
+# maksaa pelkät agenttikutsut — ja tärkeimmät: injektiosarjan kynnys on
+# nolla, ja työkaluvalinta rikkoutuu herkimmin kehotemuutoksesta. Täysi
+# sarja lisäisi arvioijakutsun jokaisesta vastauksesta, eikä sitä kannata
+# ajaa jokaisesta committista.
+#
+# Ajaja palauttaa exit-koodin 1 kynnysalituksesta, joten työ kaatuu itsestään.
+# Se on koko syy siihen, että ajaja palauttaa exit-koodin.
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    # Ilman salaisuuksia ajo on merkityksetön, ja forkin PR ei niitä saa.
+    if: github.event_name == 'workflow_dispatch' || github.repository_owner != ''
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      MODEL_ID: claude-haiku-4-5-20251001
+      JUDGE_PROVIDER: openai
+      JUDGE_MODEL: gpt-5-nano
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Onko avaimet
+        id: avaimet
+        run: echo "on=${{ env.ANTHROPIC_API_KEY != '' && env.OPENAI_API_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Ohitettiin
+        if: steps.avaimet.outputs.on != 'true'
+        run: echo "ANTHROPIC_API_KEY tai OPENAI_API_KEY puuttuu — evaluointi ohitettu."
+
+      # Kanta ja indeksi rakennetaan ajossa. PGlite tarkoittaa ettei
+      # CI tarvitse palvelua eikä salaisuutta tietokannalle.
+      - if: steps.avaimet.outputs.on == 'true'
+        run: npm run setup
+
+      # Arvioija tarkistetaan ennen kuin sillä mitataan mitään.
+      - if: steps.avaimet.outputs.on == 'true'
+        run: npm run judge:check
+
+      - if: steps.avaimet.outputs.on == 'true'
+        run: npm run eval -- injection toolChoice
+
+      - if: steps.avaimet.outputs.on == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval-results.json
+          if-no-files-found: ignore

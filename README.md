@@ -1,5 +1,8 @@
 # Nordkanta-agentti
 
+[![ci](https://github.com/OMISTAJA/REPO/actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![eval](https://github.com/OMISTAJA/REPO/actions/workflows/eval.yml/badge.svg)](../../actions/workflows/eval.yml)
+
 `npm install && npm run setup && npm run dev` toimii ilman API-avaimia.
 
 Ei Dockeria, ei pilvitiliä, ei avaimia: tietokanta on PGlite (Postgres
@@ -509,6 +512,30 @@ Järjestyksessä:
 7. **Katkelmatason osumaseuranta.** Mitkä katkelmat päätyvät vastauksiin ja mitkä
    eivät koskaan. Käyttämätön katkelma on joko turha tai löytymätön, ja ne
    vaativat eri korjauksen.
+
+## CI
+
+Kaksi työnkulkua, eri syistä.
+
+`ci.yml` ajaa tyyppitarkistuksen, turvakerroksen yksikkötestit,
+`/demo`-reitin kustannuslupauksen ja rakennuksen **jokaisesta pushista ja
+PR:stä, ilman salaisuuksia**. Se on mahdollista siksi, että mikään näistä ei
+tarvitse API-avaimia eikä tietokantapalvelua — PGlite riittää.
+
+`eval.yml` ajaa **injektio- ja työkalusarjat** pushilla mainiin. Ne ovat
+halvimmat (kumpikaan ei kutsu arvioijaa) ja tärkeimmät: injektiosarjan kynnys
+on nolla, ja työkaluvalinta rikkoutuu herkimmin kehotemuutoksesta. Ajaja
+palauttaa exit-koodin 1 kynnysalituksesta, joten työ kaatuu itsestään — se on
+koko syy siihen, että ajaja palauttaa exit-koodin. Ennen sarjaa ajetaan
+`npm run judge:check`: arvioija tarkistetaan ennen kuin sillä mitataan mitään.
+
+Täyttä neljän mittarin sarjaa ei ajeta pushilla, koska se lisäisi
+arvioijakutsun jokaisesta vastauksesta. Se ajetaan käsin ennen julkaisua.
+
+Salaisuudet GitHubin secrets-osioon: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`.
+Ilman niitä `eval.yml` ohittaa ajon nimetyllä viestillä eikä epäonnistu
+hiljaa. **Badge-osoitteissa on paikanpitäjä `OMISTAJA/REPO`** — korvaa se
+julkaisun yhteydessä.
 
 ## Rakenne
 

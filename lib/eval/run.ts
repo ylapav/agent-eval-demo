@@ -362,6 +362,39 @@ const fmt = (r: SuiteResult, n: number) =>
   r.yksikko === "lukumäärä" ? String(n) : `${(n * 100).toFixed(1)} %`;
 
 async function main() {
+  /**
+   * Sarjan valinta komentoriviltä: `npm run eval -- injection toolChoice`.
+   *
+   * CI ajaa vain injektio- ja työkalusarjat jokaisella pushilla. Ne ovat
+   * halvimmat — kumpikaan ei kutsu arvioijaa lainkaan — ja tärkeimmät:
+   * injektiosarja on ainoa, jonka kynnys on nolla, ja työkaluvalinta
+   * rikkoutuu herkimmin kehotemuutoksesta. Täysi sarja maksaa
+   * arvioijakutsun jokaisesta vastauksesta, eikä sitä kannata ajaa
+   * jokaisesta committista.
+   */
+  const KAIKKI = [
+    ["groundedness", "lähdeperusteisuus", evalGroundedness],
+    ["toolChoice", "työkaluvalinta", evalToolChoice],
+    ["injection", "injektio", evalInjection],
+    ["refusal", "kieltäytyminen", evalRefusal],
+  ] as const;
+
+  const valitut = process.argv.slice(2).filter((a) => !a.startsWith("-"));
+  const tuntemattomat = valitut.filter((v) => !KAIKKI.some(([k]) => k === v));
+  if (tuntemattomat.length) {
+    console.error(
+      `Tuntematon sarja: ${tuntemattomat.join(", ")}. Kelvolliset: ${KAIKKI.map(([k]) => k).join(", ")}`,
+    );
+    process.exit(2);
+  }
+
+  const ajettavat = valitut.length ? KAIKKI.filter(([k]) => valitut.includes(k)) : KAIKKI;
+  if (valitut.length) {
+    console.log(`sarjat:    ${ajettavat.map(([k]) => k).join(", ")} (osajoukko)`);
+  }
+  console.log("");
+
+
   // Valeupotuksella ajettu evaluointi tuottaisi lukuja, jotka näyttävät
   // mittaustuloksilta mutta eivät ole. Se on huonompi lopputulos kuin
   // ajamatta jättäminen, joten se estetään tässä eikä varoiteta siitä.
@@ -427,12 +460,7 @@ async function main() {
   console.log(`kehote:    ${PROMPT_HASH}\n`);
 
   const results: SuiteResult[] = [];
-  for (const [nimi, fn] of [
-    ["lähdeperusteisuus", evalGroundedness],
-    ["työkaluvalinta", evalToolChoice],
-    ["injektio", evalInjection],
-    ["kieltäytyminen", evalRefusal],
-  ] as const) {
+  for (const [, nimi, fn] of ajettavat) {
     process.stdout.write(`${nimi.padEnd(20)}`);
     results.push(await fn());
     process.stdout.write("\n");
@@ -476,7 +504,14 @@ async function main() {
     JSON.stringify({ meta, results }, null, 2),
     "utf8",
   );
-  writeReadmeResults(meta, results);
+  // README-taulukko kirjoitetaan vain TÄYDESTÄ ajosta. Osajoukko jättäisi
+  // kaksi riviä vanhoiksi ja kaksi uusiksi, ja taulukko näyttäisi yhdeltä
+  // ajolta vaikka olisi kahdesta eri hetkestä.
+  if (valitut.length) {
+    console.log("(osajoukkoajo — README-taulukkoa ei kirjoitettu)");
+  } else {
+    writeReadmeResults(meta, results);
+  }
 
   console.log("\ntulokset: eval-results.json, README.md päivitetty");
   // Exit-koodi, jotta tämän voi kytkeä CI:hin ilman lisätyötä.
