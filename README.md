@@ -1,14 +1,21 @@
 # Nordkanta-agentti
 
-Ajettavissa ilman yhtäkään API-avainta:
+`npm install && npm run setup && npm run dev` toimii ilman API-avaimia.
 
-```bash
-npm install && npm run setup && npm run dev
-```
+Ei Dockeria, ei pilvitiliä, ei avaimia: tietokanta on PGlite (Postgres
+WASM-muodossa) ja haku käyttää Postgresin tekstihakua, kun upotusavainta ei ole.
+Agentin vastaaminen vaatii `ANTHROPIC_API_KEY`:n — kaikki muu ei.
+
+**Haluatko vain nähdä sen toiminnassa?** `/demo` toistaa neljä tallennettua
+keskustelua työkalukutsuineen, katkelmineen ja osuvuuspisteineen. Se on
+**tallenne eikä elävä ajo**: sivu lukee `demo-runs.json`:in eikä kutsu mallia
+lainkaan, joten sen katselu ei maksa mitään. Tallenne syntyy komennolla
+`npm run record`, ja [tests/demo-cost.test.ts](tests/demo-cost.test.ts) kaatuu
+jos reitin riippuvuuspuuhun ilmestyy Anthropic-SDK.
 
 Suomenkielinen asiakaspalveluagentti kuvitteelliselle
 rakennustarvikevalmistajalle: se vastaa takuu- ja toimitusehdoista
-vektorihaulla, hakee hinnat ja saatavuudet tuotetaulusta, varaa soittopyyntöjä
+tietopohjasta, hakee hinnat ja saatavuudet tuotetaulusta, varaa soittopyyntöjä
 ja luo tikettejä. Kirjoittavilla operaatioilla on rakenteelliset rajat koodissa
 eikä kehotteessa, ja mukana on evaluointikerros, joka mittaa milloin agentti oli
 väärässä. Nordkanta Oy ei ole olemassa ja koko tietopohja on generoitu.
@@ -77,14 +84,56 @@ Avaimet mukaan:
 ```bash
 cp .env.example .env.local     # täytä ANTHROPIC_API_KEY ja VOYAGE_API_KEY
 npm run index                  # indeksoi tietopohja oikeilla upotuksilla
+npm run embed                  # esilaskee upotukset content/embeddings.json:iin
+npm run record                 # nauhoittaa /demo-reitin keskustelut
 ```
 
+Ilman avaimia:
+
 ```bash
-npm test                       # turvakerroksen yksikkötestit, ei avaimia eikä kantaa
+npm test                       # turvakerros + /demo:n kustannuslupaus
 npm run typecheck
-npm run eval                   # neljä mittaria, exit-koodi 1 jos jokin alittaa kynnyksen
 npm run calibrate              # hakukynnyksen kalibrointi, ei mallikutsuja
 ```
+
+Avaimen kanssa:
+
+```bash
+npm run eval                   # neljä mittaria, exit-koodi 1 jos jokin alittaa kynnyksen
+```
+
+### Hakutilat: vektori ja leksikaalinen
+
+Hakupolku valitaan `VOYAGE_API_KEY`:n mukaan ja loggataan käynnistyksessä
+(`[rag] mode=vector` tai `[rag] mode=lexical (ei VOYAGE_API_KEY)`).
+
+Syy kahteen polkuun on konkreettinen. Katkelmien upotukset voi laskea etukäteen
+(`npm run embed` kirjoittaa ne tiedostoon `content/embeddings.json`), mutta
+**käyttäjän kyselyn upotus vaatii API-kutsun joka kerta**. Ilman avainta
+vektorihaku ei siis toimi lainkaan, olivatpa katkelmat kuinka valmiiksi
+upotettuja tahansa. Leksikaalinen polku on se, joka tekee otsikon lupauksesta
+totta.
+
+Leksikaalinen polku käyttää Postgresin tekstihakua konfiguraatiolla `finnish`.
+PGliten WASM-buildista löytyy suomen stemmer — tarkistettu ajamalla
+`SELECT cfgname FROM pg_ts_config` — ja se on olennainen, koska suomessa
+haettava sana on lähes aina eri taivutusmuodossa kuin tekstissä:
+"kattopelleillä" ja "kattopelti" ovat sama sana vain stemmerin kanssa.
+
+**Nämä eivät ole toistensa varmuuskopioita vaan hybridihaun puolikkaat.**
+Vektorihaku löytää merkityksen ja pettää tuotenumeroilla ja tarkoilla termeillä;
+leksikaalinen löytää tarkat termit ja pettää synonyymeillä. Kumpikin on tässä
+repossa toteutettuna ja mitattuna; yhdistäminen on jatkotöissä, ja alla oleva
+mittaus on sen perustelu.
+
+Kynnykset ovat erikseen (`RELEVANCE_FLOOR_VECTOR`, `RELEVANCE_FLOOR_LEXICAL`),
+koska `ts_rank` ei ole kosinisimilaarisuus eikä niiden arvoja voi verrata.
+Leksikaalinen kynnys on **mitattu** (`npm run calibrate`, n=24 kyselyä):
+jakaumat menevät päällekkäin — pitäisi-löytyä 0,017–0,076 ja ei-saa-löytyä
+0,015–0,038 — joten erotusrajaa ei ole olemassa. Luku 0,01 on tietoinen valinta
+saantiin päin eikä kalibroitu kynnys, ja sama lukee koodissa. Pelkkä
+leksikaalinen haku ei siis erottele tätä aineistoa, ja korjaus on hybridihaku
+eikä luvun säätäminen.
 
 ### Vercel
 
@@ -93,6 +142,9 @@ Tuo repo Verceliin ja aseta ympäristömuuttujat: `DATABASE_URL` (Neon),
 Aja `npm run setup` kerran paikallisesti Neonin URL:lla osoittaen, jotta skeema
 ja tietopohja ovat paikallaan. Muuta konfiguraatiota ei tarvita.
 
+`AGENT_WEBHOOK_SECRET` tarvitaan vain jos ajat webhookia. Julkinen versio ei
+tarjoile sitä — katso [Mitä ei ole toteutettu](#mitä-ei-ole-toteutettu).
+
 PGlite pysyy riippuvuuspuussa mutta ei käytössä, koska `DATABASE_URL` osoittaa
 Neoniin. Se on merkitty ulkoiseksi paketiksi `next.config.ts`:ssä — muuten
 bundleri tiivistäisi sen WASM-tiedostojen nimet ja pgvector katoaisi hiljaa.
@@ -100,10 +152,11 @@ bundleri tiivistäisi sen WASM-tiedostojen nimet ja pgvector katoaisi hiljaa.
 ## Webhook
 
 Agentti on käytettävissä myös ilman käyttöliittymää. Sama `runAgent()`, eri
-sisääntulo.
+sisääntulo. **Päätepistettä ei julkaista**: se on tarkoitettu ajettavaksi
+paikallisesti omalla salaisuudella, joka asetetaan `.env.local`-tiedostoon.
 
 ```bash
-curl -X POST https://<host>/api/agent \
+curl -X POST http://localhost:3000/api/agent \
   -H "x-agent-secret: $AGENT_WEBHOOK_SECRET" \
   -H "content-type: application/json" \
   -d '{"sessionId":"crm-4821","message":"Mikä on kattopeltien takuuaika?"}'
@@ -271,7 +324,10 @@ toimii, koska se on juuri se oletus jota evaluoinnin on tarkoitus koetella.
 
 ### Hakukynnys ja sen kalibrointi
 
-`lib/rag/search.ts` sisältää osuvuuskynnyksen `RELEVANCE_FLOOR`. Ilman sitä
+Tämä osio koskee **vektoripolun** kynnystä; leksikaalinen on mitattu ja
+käsitelty kohdassa [Hakutilat](#hakutilat-vektori-ja-leksikaalinen).
+
+`lib/rag/search.ts` sisältää osuvuuskynnyksen `RELEVANCE_FLOOR_VECTOR`. Ilman sitä
 vektorihaku palauttaa aina k parasta, myös kun mikään ei liity kysymykseen —
 ja se on suoraan keksimismittarin epäonnistuminen. Tyhjä tulos on parempi kuin
 huono tulos, koska tyhjä saa mallin sanomaan "en tiedä".
@@ -290,8 +346,8 @@ kuuluu niiden väliin. **Jos jakaumat menevät päällekkäin, mikään kynnys e
 niitä**, ja korjaus on haussa (hybridihaku, pilkkominen) eikä luvun säätämisessä.
 Kynnyksen viilaaminen päällekkäisillä jakaumilla on ylisovittamista testisettiin.
 
-**Nykyinen arvo `0.35` on arvattu, ei mitattu.** Sitä ei ole kalibroitu
-voyage-3-lite-upotuksilla. Se on siinä siksi, että jokin kynnys on parempi kuin
+**Vektoripolun arvo `0.35` on arvattu, ei mitattu.** Sitä ei ole kalibroitu
+voyage-3-lite-upotuksilla, koska kalibrointi vaatii `VOYAGE_API_KEY`:n. Se on siinä siksi, että jokin kynnys on parempi kuin
 ei kynnystä — ei siksi, että 0,35 olisi oikea luku. Sama lukee koodissa
 (`lib/rag/search.ts`), jotta lukija ei löydä väitettä vain toisesta paikasta.
 
@@ -338,7 +394,14 @@ Tietoisia rajauksia:
   arvata toisen istunnon tunnuksen ja lukea sen historian agentin vastauksista.
   Tuotannossa tunnus sidottaisiin autentikoituun käyttäjään; demossa se on
   selaimen `sessionStorage`-arvo.
-- **Ei nopeusrajoitusta.** Tuotannossa pakollinen, demossa melua.
+- **Ei julkista webhook-päätepistettä.** Reitti `/api/agent` on repossa ja
+  testattavissa paikallisesti omalla salaisuudella, mutta sitä ei tarjoilla
+  julkisesti. Julkinen päätepiste vaatisi nopeusrajoituksen, kustannuskaton ja
+  salaisuuden kierrätyksen; ilman niitä jaettu salaisuus on yhden vuodon päässä
+  siitä, että kuka tahansa ajaa mallia laskuun.
+- **Ei nopeusrajoitusta eikä kustannuskattoa.** Kumpaakaan ei tarvita, koska
+  julkinen pinta ei kutsu mallia ajonaikana: `/demo` on tallenne. Ne tulisivat
+  samassa työssä kuin julkinen webhook.
 - **Ei striimausta.** Vastaus tulee kerralla. Käyttökokemus kärsii, mitattavuus ei.
 - **Ei palvelinpuolen fallback-mallia.** Kieltäytyminen käsitellään omana
   lopputuloksenaan (`stop_reason: "refusal"`), mutta varamalliin ei siirrytä.
@@ -390,22 +453,30 @@ Järjestyksessä:
 ## Rakenne
 
 ```
-app/page.tsx           chat-UI
-app/admin/             admin-näkymä, salasanasuojattu
-app/api/chat/          chat-UI:n reitti
-app/api/agent/         webhook, jaettu salaisuus
-db/index.ts            ajurin valinta URL:n muodosta
-db/schema.ts           Drizzle-skeema, pgvector
-lib/agent/prompt.ts    järjestelmäkehote + hash
-lib/agent/tools.ts     työkalumääritykset ja toteutukset
-lib/agent/guards.ts    kirjoituskatto, vahvistusportti, prioriteetin johtaminen
-lib/agent/models.ts    hinnasto ja mallikohtaiset kyvyt
-lib/agent/loop.ts      agenttisilmukka, lokitus, kustannus
-lib/rag/embed.ts       upotukset, eristetty yhteen tiedostoon
-lib/rag/search.ts      vektorihaku + osuvuuskynnys
-lib/eval/              neljä mittaria + lukitut kynnykset + ajaja + raportti
-eval-sets/             testitapaukset JSONina
-tests/                 turvakerroksen yksikkötestit
-scripts/               migraatiot, siemendata, kynnyksen kalibrointi
-content/               tietopohja markdownina, 16 dokumenttia
+app/page.tsx             chat-UI
+app/demo/                tallennettujen ajojen toisto, ei mallikutsuja
+app/admin/               admin-näkymä, salasanasuojattu
+app/api/chat/            chat-UI:n reitti
+app/api/agent/           webhook, jaettu salaisuus, ei julkaista
+db/index.ts              ajurin valinta URL:n muodosta
+db/schema.ts             Drizzle-skeema, pgvector
+lib/agent/prompt.ts      järjestelmäkehote + hash
+lib/agent/tools.ts       työkalumääritykset ja toteutukset
+lib/agent/guards.ts      kirjoituskatto, vahvistus- ja selvittelyportti, prioriteetti
+lib/agent/models.ts      hinnasto ja mallikohtaiset kyvyt
+lib/agent/loop.ts        agenttisilmukka, lokitus, kustannus
+lib/rag/chunker.ts       tietopohjan pilkkominen, jaettu indeksoinnin kanssa
+lib/rag/embed.ts         upotukset, eristetty yhteen tiedostoon
+lib/rag/search.ts        vektori- ja leksikaalinen haku + kynnykset
+lib/demo/types.ts        tallenteen tyypit, ei yhtään importtia
+lib/eval/                neljä mittaria + lukitut kynnykset + ajaja + raportti
+eval-sets/               testitapaukset JSONina
+tests/guards.test.ts     turvakerros
+tests/demo-cost.test.ts  /demo ei saa tuoda mallia
+scripts/record.ts        nauhoittaa demo-runs.json:in
+scripts/embed-content.ts esilaskee content/embeddings.json:in
+scripts/                 lisäksi migraatiot, siemendata, kalibrointi
+demo-scripts.json        nauhoitettavat keskustelut
+demo-annotations.json    käsin kirjoitettu kommentaari vuoroille
+content/                 tietopohja markdownina, 16 dokumenttia
 ```
