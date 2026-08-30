@@ -2,8 +2,9 @@ import "@/lib/env";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { evalRuns } from "@/db/schema";
+import { evalRuns, turns } from "@/db/schema";
 import { runAgent, MODEL_ID, EFFORT } from "@/lib/agent/loop";
 import { PROMPT_HASH } from "@/lib/agent/prompt";
 import { EMBED_MODE, EMBED_MODEL } from "@/lib/rag/embed";
@@ -11,10 +12,23 @@ import { scoreGroundedness, JUDGE_MODEL } from "./groundedness";
 import { THRESHOLDS } from "./thresholds";
 import { writeReadmeResults } from "./report";
 
+/**
+ * Yksi vuoro synteettisessä historiassa.
+ *
+ * `tyokalut` kertoo, mitkä työkalut kyseisellä vuorolla onnistuivat. Sitä
+ * tarvitaan, koska kirjoitusvartijat lukevat istunnon tilan kannasta:
+ * pelkkä viestilista ei kerro, tehtiinkö istunnossa selvittelyä.
+ */
+type HistoryTurn = {
+  role: "user" | "assistant";
+  content: string;
+  tyokalut?: string[];
+};
+
 type Case = {
   id: string;
   viesti: string;
-  historia?: Anthropic.MessageParam[];
+  historia?: HistoryTurn[];
   odotettu_tyokalu?: string | null;
   kielletyt_tyokalut?: string[];
   vuoto_jos?: { tyokalu?: string; teksti_sisaltaa?: string[] };
@@ -43,16 +57,64 @@ const load = (f: string): Case[] =>
 
 const sid = (suite: string, id: string) => `eval-${suite}-${id}-${Date.now()}`;
 
+/**
+ * Kirjoittaa synteettisen historian turns-tauluun ennen tapauksen ajoa.
+ *
+ * Kirjoitusvartijat lukevat istunnon tilan kannasta eivätkä pyynnön mukana
+ * tulleesta viestilistasta — se on koko syy siihen, ettei asiakas voi
+ * väittää vahvistuskierroksen tapahtuneen. Sama valinta tarkoittaa, että
+ * evaluoinnin on rakennettava tila kantaan, tai jokainen kirjoitus estyisi
+ * riippumatta siitä mitä malli tekee. Silloin injektiomittari näyttäisi
+ * vihreältä mittaamatta mallista mitään.
+ *
+ * Rivit ovat fikstuureja eivätkä tapahtumia, joten ne poistetaan tapauksen
+ * jälkeen. Fabrikoitu rivi tuotantolokissa on lokin valehtelemista.
+ */
+async function seedSession(sessionId: string, historia: HistoryTurn[]): Promise<void> {
+  for (let i = 0; i < historia.length - 1; i++) {
+    const u = historia[i];
+    const a = historia[i + 1];
+    if (u.role !== "user" || a.role !== "assistant") continue;
+    await db.insert(turns).values({
+      sessionId,
+      source: "eval",
+      userMessage: u.content,
+      assistantMessage: a.content,
+      toolCalls: (a.tyokalut ?? []).map((name) => ({
+        name,
+        input: {},
+        output: {},
+        ok: true,
+        ms: 0,
+      })),
+      modelId: MODEL_ID,
+      promptHash: PROMPT_HASH,
+    });
+  }
+}
+
+async function clearSession(sessionId: string): Promise<void> {
+  await db.delete(turns).where(eq(turns.sessionId, sessionId));
+}
+
 async function ask(suite: string, c: Case) {
-  return runAgent({
-    sessionId: sid(suite, c.id),
-    source: "eval",
-    userMessage: c.viesti,
-    // Historia annetaan eksplisiittisesti, jotta tapaus on toistettava.
-    // Ilman tätä monivuorotapaus riippuisi siitä, mitä kannassa sattuu olemaan.
-    history: c.historia ?? [],
-    persist: false, // evaluointi ei saastuta tuotantolokia
-  });
+  const sessionId = sid(suite, c.id);
+  const historia = c.historia ?? [];
+  if (historia.length) await seedSession(sessionId, historia);
+  try {
+    return await runAgent({
+      sessionId,
+      source: "eval",
+      userMessage: c.viesti,
+      // Historia annetaan myös eksplisiittisesti, jotta malli näkee
+      // täsmälleen sen mitä tapaus määrittelee. Kannassa oleva kopio on
+      // vartijoita varten; tämä on mallia varten.
+      history: historia.map(({ role, content }) => ({ role, content })),
+      persist: false, // evaluointi ei saastuta tuotantolokia
+    });
+  } finally {
+    if (historia.length) await clearSession(sessionId);
+  }
 }
 
 /** Tietopohjakatkelmat, jotka vastaus tosiasiassa sai käyttöönsä. */

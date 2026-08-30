@@ -7,6 +7,7 @@ import { searchChunks } from "@/lib/rag/search";
 import {
   assertWriteAllowed,
   assertConfirmationRound,
+  assertPriorResearch,
   derivePriority,
   normalizePhone,
 } from "./guards";
@@ -110,6 +111,8 @@ export type ToolContext = {
   writeCount: { value: number };
   /** Aiempien vuorojen määrä tässä istunnossa. 0 = keskustelun ensimmäinen vuoro. */
   priorTurns: number;
+  /** Aiemmissa vuoroissa onnistuneiden lukutyökalukutsujen määrä. 0 = ei selvittelyä. */
+  priorReads: number;
   /** Kerätään, jotta evaluointi tietää mitä katkelmia vastaus sai käyttöönsä. */
   retrievedChunkIds: string[];
 };
@@ -168,6 +171,7 @@ export async function runTool(
 
     case "varaa_soitto": {
       assertConfirmationRound(ctx);
+      assertPriorResearch(ctx);
       assertWriteAllowed(ctx);
       const v = CallbackInput.parse(input);
       const [row] = await db
@@ -186,6 +190,7 @@ export async function runTool(
 
     case "luo_tiketti": {
       assertConfirmationRound(ctx);
+      assertPriorResearch(ctx);
       assertWriteAllowed(ctx);
       const v = TicketInput.parse(input);
       // Prioriteetti johdetaan tyypistä. Malli ei aseta sitä eikä voi nostaa sitä.

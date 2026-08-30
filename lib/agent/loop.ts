@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { turns, type ToolCallLog } from "@/db/schema";
 import { SYSTEM_PROMPT, PROMPT_HASH, wrapToolResult } from "./prompt";
 import { TOOL_DEFS, runTool, type ToolContext } from "./tools";
-import { GuardError, loadWriteCount } from "./guards";
+import { GuardError, loadWriteCount, loadReadCount } from "./guards";
 import { estimateCostUsd, specFor } from "./models";
 
 const anthropic = new Anthropic();
@@ -87,6 +87,9 @@ export async function runAgent(opts: {
     // käytännössä "2 per HTTP-pyyntö".
     writeCount: { value: await loadWriteCount(opts.sessionId) },
     priorTurns: history.filter((m) => m.role === "user").length,
+    // Selvittelyn määrä luetaan kannasta samasta syystä kuin kirjoituskatto:
+    // vain kanta tietää mitä istunnossa on aiemmin oikeasti tapahtunut.
+    priorReads: await loadReadCount(opts.sessionId),
     retrievedChunkIds: [],
   };
 
