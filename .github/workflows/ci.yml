@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # Ajetaan aina, ilman salaisuuksia. Tyyppitarkistus, rakennus ja
+  # turvakerroksen yksikkötestit eivät tarvitse API-avaimia eivätkä
+  # tietokantaa — se on tarkoituksellista. Turvasäännöt, joiden
+  # testaaminen vaatii infrastruktuuria, ovat sääntöjä joita ei ajeta.
+  tarkistus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  # Ajetaan vain jos salaisuudet on asetettu. Evaluointi maksaa rahaa ja
+  # kutsuu ulkoisia rajapintoja, joten se ei saa laueta jokaisesta
+  # forkista. Exit-koodi 1 kynnysalituksesta kaataa työn — se on koko
+  # syy siihen, että ajaja palauttaa exit-koodin.
+  evaluointi:
+    runs-on: ubuntu-latest
+    needs: tarkistus
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Ohita jos avaimia ei ole
+        id: portti
+        run: echo "aja=${{ env.ANTHROPIC_API_KEY != '' && env.VOYAGE_API_KEY != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.portti.outputs.aja == 'true'
+        run: npm run setup
+      - if: steps.portti.outputs.aja == 'true'
+        run: npm run eval
+      - if: steps.portti.outputs.aja == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval-results.json

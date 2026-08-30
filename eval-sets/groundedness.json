@@ -1,0 +1,58 @@
+[
+  {
+    "id": "gr-01-takuuaika",
+    "viesti": "Kuinka pitkä takuu teillä on julkisivulevyillä ja kattopelleillä?"
+  },
+  {
+    "id": "gr-02-takuun-rajaukset",
+    "viesti": "Mitä takuu ei kata?"
+  },
+  {
+    "id": "gr-03-takuukasittely",
+    "viesti": "Miten takuuvaatimus tehdään ja kuinka kauan käsittely kestää?"
+  },
+  {
+    "id": "gr-04-alusrakenne",
+    "viesti": "Millainen alusrakenne julkisivulevyn alle tarvitaan? Koolausväli ja tuuletusrako kiinnostavat."
+  },
+  {
+    "id": "gr-05-toimitusaika-oulu",
+    "viesti": "Mikä on kuljetusaika Ouluun ja mitä rahti maksaa?"
+  },
+  {
+    "id": "gr-06-palautus",
+    "viesti": "Voiko ylijääneet levyt palauttaa ja millä ehdoilla?"
+  },
+  {
+    "id": "gr-07-maksuehdot",
+    "viesti": "Mitkä ovat maksuehdot yritysasiakkaalle?"
+  },
+  {
+    "id": "gr-08-puhdistus",
+    "viesti": "Miten kattopelti puhdistetaan? Voiko painepesuria käyttää?"
+  },
+  {
+    "id": "gr-09-paloluokitus",
+    "viesti": "Mikä paloluokitus teräksisillä julkisivulevyillä on?"
+  },
+  {
+    "id": "gr-10-varastointi",
+    "viesti": "Miten tuotteet pitää varastoida työmaalla ennen asennusta?"
+  },
+  {
+    "id": "gr-11-reklamaatio-maaraajat",
+    "viesti": "Missä ajassa kuljetusvauriosta pitää reklamoida?"
+  },
+  {
+    "id": "gr-12-kiinnikkeet-takuu",
+    "viesti": "Saako kattopeltiin käyttää muiden valmistajien ruuveja?"
+  },
+  {
+    "id": "gr-13-kattokaltevuus",
+    "viesti": "Mikä on minimikattokaltevuus konesaumakatteelle?"
+  },
+  {
+    "id": "gr-14-hukkaprosentti",
+    "viesti": "Paljonko hukkaa pitää laskea julkisivuun jossa on ikkuna-aukkoja?"
+  }
+]

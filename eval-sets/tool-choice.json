@@ -1,0 +1,93 @@
+[
+  {
+    "id": "tc-01",
+    "viesti": "Paljonko Nordkanta Klassikko julkisivulevy maksaa neliöltä?",
+    "odotettu_tyokalu": "hae_tuotteet",
+    "kielletyt_tyokalut": [
+      "luo_tiketti",
+      "varaa_soitto"
+    ]
+  },
+  {
+    "id": "tc-02",
+    "viesti": "Kuinka pitkä takuu teillä on kattopelleillä?",
+    "odotettu_tyokalu": "hae_tietopohjasta",
+    "kielletyt_tyokalut": [
+      "luo_tiketti"
+    ]
+  },
+  {
+    "id": "tc-03",
+    "viesti": "Onko teillä mustia julkisivulevyjä varastossa?",
+    "odotettu_tyokalu": "hae_tuotteet"
+  },
+  {
+    "id": "tc-04",
+    "viesti": "Mikä on toimitusaika Ouluun?",
+    "odotettu_tyokalu": "hae_tietopohjasta"
+  },
+  {
+    "id": "tc-05",
+    "viesti": "Levy halkeili kahden kuukauden jälkeen. Mitä teen?",
+    "odotettu_tyokalu": "hae_tietopohjasta",
+    "kielletyt_tyokalut": [
+      "luo_tiketti"
+    ]
+  },
+  {
+    "id": "tc-06",
+    "viesti": "Moi",
+    "odotettu_tyokalu": null,
+    "kielletyt_tyokalut": [
+      "hae_tietopohjasta",
+      "hae_tuotteet",
+      "luo_tiketti",
+      "varaa_soitto"
+    ]
+  },
+  {
+    "id": "tc-07",
+    "viesti": "Kiitos, tämä riitti.",
+    "odotettu_tyokalu": null,
+    "kielletyt_tyokalut": [
+      "hae_tietopohjasta",
+      "hae_tuotteet"
+    ]
+  },
+  {
+    "id": "tc-08",
+    "viesti": "Haluan tarjouksen 400 neliön julkisivusta. Nimi Matti Virtanen, puhelin 0401234567.",
+    "odotettu_tyokalu": null,
+    "kielletyt_tyokalut": [
+      "varaa_soitto"
+    ]
+  },
+  {
+    "id": "tc-09",
+    "viesti": "Mitä värejä kattopelleissä on ja mikä niiden toimitusaika on?",
+    "odotettu_tyokalu": "hae_tuotteet"
+  },
+  {
+    "id": "tc-10",
+    "viesti": "Millainen alusrakenne julkisivulevyn alle tarvitaan?",
+    "odotettu_tyokalu": "hae_tietopohjasta"
+  },
+  {
+    "id": "tc-11",
+    "viesti": "Kuinka nopeasti Profiilipelti PP20 on saatavilla tehtaalta?",
+    "odotettu_tyokalu": "hae_tuotteet",
+    "kielletyt_tyokalut": [
+      "luo_tiketti",
+      "varaa_soitto"
+    ]
+  },
+  {
+    "id": "tc-12",
+    "viesti": "Mitä rahti maksaa 600 euron tilauksesta?",
+    "odotettu_tyokalu": "hae_tietopohjasta",
+    "kielletyt_tyokalut": [
+      "luo_tiketti",
+      "varaa_soitto"
+    ]
+  }
+]

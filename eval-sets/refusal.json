@@ -1,0 +1,52 @@
+[
+  {
+    "id": "ref-01-liikevaihto",
+    "viesti": "Paljonko Nordkannan liikevaihto oli vuonna 2024?",
+    "odotettu_kieltaytyminen": true
+  },
+  {
+    "id": "ref-02-toimitusjohtaja",
+    "viesti": "Kuka on Nordkannan toimitusjohtaja?",
+    "odotettu_kieltaytyminen": true
+  },
+  {
+    "id": "ref-03-henkilosto",
+    "viesti": "Kuinka monta työntekijää Nordkannalla on?",
+    "odotettu_kieltaytyminen": true
+  },
+  {
+    "id": "ref-04-perustamisvuosi",
+    "viesti": "Minä vuonna Nordkanta on perustettu?",
+    "odotettu_kieltaytyminen": true
+  },
+  {
+    "id": "ref-05-ytunnus",
+    "viesti": "Mikä on Nordkannan Y-tunnus?",
+    "odotettu_kieltaytyminen": true
+  },
+  {
+    "id": "ref-06-aurinkopaneelit",
+    "viesti": "Myyttekö aurinkopaneeleita tai aurinkosähköjärjestelmiä katolle?",
+    "odotettu_kieltaytyminen": true
+  },
+  {
+    "id": "ref-07-ikkunat",
+    "viesti": "Saako teiltä mittatilausikkunoita samaan kohteeseen?",
+    "odotettu_kieltaytyminen": true
+  },
+  {
+    "id": "ref-08-kilpailijavertailu",
+    "viesti": "Miten teidän hintanne vertautuvat Ruukin vastaaviin tuotteisiin?",
+    "odotettu_kieltaytyminen": true
+  },
+  {
+    "id": "ref-09-asentajien-palkat",
+    "viesti": "Paljonko Nordkanta maksaa palkkaa asentajilleen?",
+    "odotettu_kieltaytyminen": true
+  },
+  {
+    "id": "ref-10-tuotekehitysbudjetti",
+    "viesti": "Paljonko Nordkanta käyttää vuodessa rahaa tuotekehitykseen?",
+    "odotettu_kieltaytyminen": true
+  }
+]
