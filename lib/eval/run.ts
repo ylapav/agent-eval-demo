@@ -453,6 +453,7 @@ async function main() {
     await db.insert(evalRuns).values({
       suite: r.suite,
       modelId: MODEL_ID,
+      judgeModel: JUDGE_MODEL,
       promptHash: PROMPT_HASH,
       score: r.score,
       threshold: r.threshold,

@@ -75,9 +75,15 @@ tuotannossa. Neonin URL vaihtaa ajurin, koodi ei muutu.
 
 ## Käynnistys
 
-Ylimmän komennon jälkeen chat on osoitteessa `/` ja admin-näkymä `/admin`
-(vaatii `ADMIN_PASSWORD`). Ei Dockeria, ei pilvitiliä: `npm run setup` ajaa
-migraatiot, tuotedatan ja tietopohjan indeksoinnin PGliteen.
+Ylimmän komennon jälkeen etusivu on `/`, tallennetut ajot `/demo`, evaluoinnin
+tulokset `/eval` ja admin-näkymä `/admin` (vaatii `ADMIN_PASSWORD`). Ei Dockeria,
+ei pilvitiliä: `npm run setup` ajaa migraatiot, tuotedatan ja tietopohjan
+indeksoinnin PGliteen.
+
+**PGlite on yhden prosessin kanta.** Kehityspalvelin pitää hakemistoa `.data/pg`
+auki, joten `npm run eval`, `npm run record`, `npm run index` ja `npm run db:seed`
+on ajettava palvelin pysäytettynä. Muuten skripti kirjoittaa eri näkymään kuin
+palvelin lukee, eikä kumpikaan kerro siitä mitään. Neon-ajossa rajoitetta ei ole.
 
 Mitä ilman avaimia toimii: rakenne, migraatiot, indeksointi, **leksikaalinen
 haku**, hakukynnys, työkalukutsujen validointi ja koko turvakerros testeineen.

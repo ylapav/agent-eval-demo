@@ -144,6 +144,12 @@ export const evalRuns = pgTable("eval_runs", {
   id: uuid("id").defaultRandom().primaryKey(),
   suite: text("suite").notNull(),
   modelId: text("model_id").notNull(),
+  /**
+   * Arvioijamalli. Ilman tätä lukija ei tiedä MILLÄ mitattiin, ja kaksi
+   * ajoa eri arvioijalla näyttäisivät vertailukelpoisilta vaikka eivät ole.
+   * Sama syy kuin promptHashilla: mittarin ehdot kuuluvat mittaustulokseen.
+   */
+  judgeModel: text("judge_model"),
   promptHash: text("prompt_hash").notNull(),
   score: real("score").notNull(),
   threshold: real("threshold").notNull(),
