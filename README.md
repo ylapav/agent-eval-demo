@@ -317,6 +317,20 @@ Tietoisia rajauksia:
   Tässä käyttötapauksessa kieltäytyminen on erittäin epätodennäköinen, ja beta-
   parametri maksaisi enemmän monimutkaisuutta kuin toisi arvoa.
 
+## Yksi bugi jonka jätin näkyviin
+
+Kirjoituskatto "enintään 2 per istunto" oli ensimmäisessä versiossa
+pyyntökohtainen: laskuri eli `runAgent`-kutsun muistissa, ja koska chatissa
+jokainen viesti on oma HTTP-pyyntönsä, katto nollautui joka viestillä eikä
+rajoittanut mitään. Koodi näytti oikealta, se rajoitti oikeaa asiaa ja yksikään
+testi ei ollut punaisella — vika oli laajuudessa, eikä laajuutta mitannut mikään.
+Korjaus on `loadWriteCount` tiedostossa [lib/agent/guards.ts](lib/agent/guards.ts):
+määrä luetaan kannasta, koska serverless-ajossa prosessimuisti ei ole edes sama
+kahden pyynnön välillä. Korjaus on tämän repon ensimmäisessä commitissa, joten
+siitä ei ole omaa diffiä nähtäväksi. Sama virheluokka löytyi kuitenkin uudelleen
+myöhemmin ja siitä on: commit `a34f4b4`, jossa vahvistusportti osoittautui
+laskevan vuoroja mutta ei sitä, tapahtuiko niissä mitään.
+
 ## Mitä tekisin seuraavaksi
 
 Järjestyksessä:
