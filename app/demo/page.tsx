@@ -91,7 +91,7 @@ export default function DemoPage() {
       <header className="site">
         <h1>Tallennetut ajot</h1>
         <span className="sub">
-          <a href="/">chat</a> · malli <span className="mono">{runs.modelId}</span> ·
+          <a href="/">etusivu</a> · <a href="/eval">tulokset</a> · malli <span className="mono">{runs.modelId}</span> ·
           kehote <span className="mono">{runs.promptHash}</span> · haku{" "}
           <span className="mono">{runs.searchMode}</span> ·{" "}
           {runs.recordedAt.slice(0, 10)}
