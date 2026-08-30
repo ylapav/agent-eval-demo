@@ -366,7 +366,7 @@ async function main() {
     console.error(
       [
         "",
-        "Evaluointia ei ajeta: VOYAGE_API_KEY puuttuu, joten haku on",
+        "Evaluointia ei ajeta: OPENAI_API_KEY puuttuu, joten haku on",
         "leksikaalisella polulla.",
         "",
         "Kynnykset lib/eval/thresholds.ts:ssä on lukittu vektoripolulle. Samojen",
@@ -376,7 +376,7 @@ async function main() {
         "Leksikaalisen polun mittaaminen on oma työnsä: se vaatii omat",
         "kynnyksensä, jotka lukitaan ennen ensimmäistä ajoa samalla tavalla.",
         "",
-        "Aseta VOYAGE_API_KEY ja ANTHROPIC_API_KEY, aja `npm run index`",
+        "Aseta OPENAI_API_KEY ja ANTHROPIC_API_KEY, aja `npm run index`",
         "uudelleen ja aja tämä sitten.",
         "",
       ].join("\n"),

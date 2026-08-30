@@ -27,6 +27,18 @@ export const chunks = pgTable(
      *  ilman avainta ja ilman esilaskettua tiedostoa. Nollavektori olisi
      *  valhe, joka tuottaisi kosinietäisyyksiä jotka näyttävät luvuilta. */
     embedding: vector("embedding", { dimensions: 512 }),
+    /**
+     * Millä mallilla tämän rivin upotus on laskettu.
+     *
+     * Tämä sarake on olemassa yhtä hiljaista virhettä varten: jos
+     * upotusmalli vaihdetaan eikä indeksointia ajeta uudelleen, vanhat
+     * vektorit jäävät vanhaan avaruuteen ja uudet kyselyt tulevat
+     * uudesta. Dimensio täsmää, mikään ei kaadu, ja haku palauttaa
+     * roskaa. Ilman tätä saraketta epäsuhtaa ei voi havaita mistään.
+     *
+     * NULL tarkoittaa "ei upotusta" (leksikaalinen tila), ei tuntematonta.
+     */
+    embedModel: text("embed_model"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [

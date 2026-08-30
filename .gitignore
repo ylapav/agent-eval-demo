@@ -9,3 +9,7 @@ drizzle/meta/_journal.json.bak
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# Next 16 generoi nämä koodiagenteille dev-ajossa. Eivät kuulu työnäytteeseen.
+AGENTS.md
+CLAUDE.md

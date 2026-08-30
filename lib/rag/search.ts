@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { chunks } from "@/db/schema";
 import { cosineDistance, desc, gt, isNotNull, and, sql } from "drizzle-orm";
-import { embedQuery, canEmbed } from "./embed";
+import { embedQuery, canEmbed, EMBED_MODEL, EMBED_PROVIDER, EMBED_DIMENSIONS } from "./embed";
 
 export type Hit = {
   id: string;
@@ -31,7 +31,9 @@ export type SearchMode = "vector" | "lexical";
 export const SEARCH_MODE: SearchMode = canEmbed() ? "vector" : "lexical";
 
 console.log(
-  SEARCH_MODE === "vector" ? "[rag] mode=vector" : "[rag] mode=lexical (ei VOYAGE_API_KEY)",
+  SEARCH_MODE === "vector"
+    ? `[rag] mode=vector provider=${EMBED_PROVIDER} model=${EMBED_MODEL} dim=${EMBED_DIMENSIONS}`
+    : "[rag] mode=lexical (ei OPENAI_API_KEY)",
 );
 
 /**
@@ -44,7 +46,7 @@ console.log(
  * "en tiedä".
  *
  * TÄMÄ LUKU ON ARVATTU, EI MITATTU. Sitä ei ole kalibroitu
- * voyage-3-lite-upotuksilla. Kalibrointi: `npm run calibrate`. Kun luku on
+ * OpenAI-upotuksilla. Kalibrointi: `npm run calibrate`. Kun luku on
  * mitattu, korvaa tämä kappale muodolla "mitattu <pvm>, n=<kyselyä>,
  * erotteluväli x,xx–y,yy" ja siirrä muutos omaan committiinsa.
  *
@@ -126,6 +128,8 @@ export const RELEVANCE_FLOOR =
  */
 const TS_CONFIG = "finnish";
 
+const NL = String.fromCharCode(10);
+
 /** Katkelman haettava teksti. Otsikko mukaan, koska se kantaa merkityksen. */
 const DOC = sql`(${chunks.docTitle} || ' ' || coalesce(${chunks.heading}, '') || ' ' || ${chunks.content})`;
 
@@ -161,12 +165,62 @@ function queryWords(query: string): string[] {
  */
 export type SearchOptions = { ignoreFloor?: boolean };
 
+/**
+ * Varmistaa, että indeksi on laskettu samalla mallilla kuin kyselyt.
+ *
+ * Tämä on koko tiedoston tärkein tarkistus, ja syy on se virheluokka josta
+ * repo muuten kertoo: jos upotusmalli vaihdetaan eikä `npm run index`
+ * ajeta, vanhat vektorit jäävät vanhaan avaruuteen ja uudet kyselyt
+ * tulevat uudesta. Dimensio täsmää, mikään ei kaadu, ja haku palauttaa
+ * roskaa — hiljaisesti, ilman virhettä tai lokiriviä.
+ *
+ * Tarkistus tehdään kerran prosessia kohti ja tulos muistetaan: se on yksi
+ * kysely, mutta hakupolulla sekin on liikaa jokaisella kutsulla.
+ * Epäsuhta KAATAA haun eikä varoita, koska varoitus katoaa lokiin ja
+ * väärät vastaukset jäävät.
+ */
+let indexChecked = false;
+
+async function assertIndexMatchesModel(): Promise<void> {
+  if (indexChecked) return;
+
+  const rows = await db
+    .selectDistinct({ model: chunks.embedModel })
+    .from(chunks)
+    .where(isNotNull(chunks.embedding));
+
+  const mallit = rows.map((r) => r.model);
+
+  // Tyhjä indeksi läpäisee triviaalisti, eikä sitä muisteta: jos tulos
+  // välimuistitettaisiin, myöhemmin ilmestyvä väärällä mallilla laskettu
+  // indeksi ei laukaisisi tarkistusta koskaan. Välimuistiin kelpaa vain
+  // tulos, joka on oikeasti tarkistanut jotain.
+  if (!mallit.length) return;
+
+  const vieraat = mallit.filter((m) => m !== EMBED_MODEL);
+  if (vieraat.length) {
+    throw new Error(
+      [
+        "Indeksi on laskettu eri upotusmallilla kuin kyselyt.",
+        `  indeksissä: ${mallit.map((m) => m ?? "(tuntematon)").join(", ")}`,
+        `  koodi odottaa: ${EMBED_MODEL}`,
+        "",
+        "Dimensio täsmää, joten haku ei kaatuisi — se palauttaisi roskaa.",
+        "Korjaus: aja `npm run index` uudelleen.",
+      ].join(NL),
+    );
+  }
+
+  indexChecked = true;
+}
+
 /** Vektorihaku. Vaatii sekä katkelmien että kyselyn upotukset. */
 export async function searchChunksVector(
   query: string,
   k = 5,
   opts: SearchOptions = {},
 ): Promise<Hit[]> {
+  await assertIndexMatchesModel();
   const vec = await embedQuery(query);
   const similarity = sql<number>`1 - (${cosineDistance(chunks.embedding, vec)})`;
 

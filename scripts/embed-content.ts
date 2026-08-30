@@ -32,7 +32,7 @@ async function main() {
     console.error(
       [
         "",
-        "VOYAGE_API_KEY puuttuu, joten upotuksia ei voi laskea.",
+        "OPENAI_API_KEY puuttuu, joten upotuksia ei voi laskea.",
         "",
         "Tämä komento on tarkoitettu ajettavaksi kerran avaimen kanssa, jotta",
         "content/embeddings.json syntyy ja muut voivat indeksoida ilman avainta.",

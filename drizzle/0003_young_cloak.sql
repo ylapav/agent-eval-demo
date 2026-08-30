@@ -1,0 +1,1 @@
+ALTER TABLE "chunks" ADD COLUMN "embed_model" text;

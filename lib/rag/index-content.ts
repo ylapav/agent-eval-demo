@@ -15,7 +15,7 @@ import { embedDocuments, canEmbed, EMBED_MODEL, EMBED_DIMENSIONS } from "./embed
 /**
  * Indeksoi content/*.md kantaan. Kolme tapaa hankkia upotukset:
  *
- *   1. VOYAGE_API_KEY asetettu   → lasketaan nyt (tuorein, maksaa)
+ *   1. OPENAI_API_KEY asetettu   → lasketaan nyt (tuorein, maksaa)
  *   2. content/embeddings.json   → luetaan tiedostosta (ilmainen, offline)
  *   3. ei kumpaakaan             → katkelmat ilman upotuksia
  *
@@ -122,13 +122,13 @@ function report(mode: Mode, file: EmbeddingsFile | null, missing: Chunk[], total
         [
           "upotukset: EI YHTÄÄN",
           "",
-          "VOYAGE_API_KEY puuttuu eikä content/embeddings.json ole olemassa.",
+          "OPENAI_API_KEY puuttuu eikä content/embeddings.json ole olemassa.",
           "Katkelmat indeksoidaan ilman upotuksia, ja haku toimii leksikaalisesti",
           "(Postgresin tekstihaku, suomen stemmer). Tämä on tuettu tila eikä virhe:",
           "demo vastaa kysymyksiin, mutta semanttista hakua ei ole.",
           "",
           "Vektorihaku käyttöön kahdella tavalla:",
-          "  - aseta VOYAGE_API_KEY ja aja `npm run index` uudelleen, tai",
+          "  - aseta OPENAI_API_KEY ja aja `npm run index` uudelleen, tai",
           "  - hanki content/embeddings.json (`npm run embed` avaimen kanssa).",
           "",
         ].join("\n"),
@@ -162,9 +162,15 @@ async function main() {
       vectors = batch.map(() => null);
     }
 
-    await db
-      .insert(chunksTable)
-      .values(batch.map((c, j) => ({ ...c, embedding: vectors[j] })));
+    await db.insert(chunksTable).values(
+      batch.map((c, j) => ({
+        ...c,
+        embedding: vectors[j],
+        // Malli kirjataan riville, jotta epäsuhta indeksin ja kyselyn
+        // välillä on havaittavissa. NULL = ei upotusta.
+        embedModel: vectors[j] ? EMBED_MODEL : null,
+      })),
+    );
     console.log(`  ${Math.min(i + B, chunks.length)}/${chunks.length}`);
   }
 

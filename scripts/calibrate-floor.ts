@@ -15,7 +15,7 @@ import { EMBED_MODEL } from "@/lib/rag/embed";
  * Kynnys on ainoa luku hakukerroksessa, jota ei voi johtaa mistään — se
  * riippuu hakutavasta, upotusmallista, kielestä ja tietopohjan koosta.
  * Siksi kumpikin polku kalibroidaan erikseen: skripti mittaa sen polun,
- * joka on käytössä (VOYAGE_API_KEY asetettu → vektori, muuten leksikaalinen),
+ * joka on käytössä (OPENAI_API_KEY asetettu → vektori, muuten leksikaalinen),
  * ja ts_rank-pisteet eivät ole vertailukelpoisia kosinisimilaarisuuden kanssa.
  * Väärin asetettuna se rikkoo kaksi mittaria eri suuntiin: liian matala
  * kynnys päästää epäolennaista kontekstia läpi ja nostaa keksimistä,
