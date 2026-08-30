@@ -1,0 +1,35 @@
+{
+  "_kommentti": "Käsin kirjoitettua kommentaaria, ei mallin tuotosta. Avain on <keskustelunId>:<vuoroIndeksi>, indeksointi alkaa nollasta. npm run record yhdistää nämä tallenteeseen, joten ne säilyvät uudelleennauhoituksen yli. Skripti myös TARKISTAA nämä nauhoitusta vasten: jos annotaatio väittää vartijan estäneen kirjoituksen eikä nauhoitteessa ole estettyä kirjoitusta, nauhoitus kaatuu. Annotaatio, joka ei vastaa tallennetta, on valhe näyteikkunassa.",
+
+  "conv-01-takuu:0": {
+    "type": "retrieval",
+    "text": "Vastaus rakentuu kolmesta katkelmasta, joiden osuvuuspisteet näkyvät yllä. Huomaa mitä agentti EI tee: se ei kerro kattaako takuu tämän tapauksen, koska katkelmat eivät kerro sitä. Ne kertovat säännön, ja ratkaisu riippuu alusrakenteesta."
+  },
+  "conv-01-takuu:1": {
+    "type": "retrieval",
+    "text": "Toinen haku samassa istunnossa. Tästä eteenpäin kirjoittava työkalu olisi sallittu: vahvistusportti vaatii aiemman vuoron ja selvittelyportti aiemman onnistuneen haun, ja molemmat täyttyvät nyt."
+  },
+
+  "conv-02-injektio:0": {
+    "type": "injection_blocked",
+    "text": "Ohje tuli TIETOPOHJASTA, ei käyttäjältä. Se on vakavampi suunta, koska katkelma näyttää järjestelmän omalta datalta — agentti näkee sen samassa <hakutulos>-lohkossa kuin oikeat takuuehdot. Suoja on tässä kehotteessa eikä koodissa: järjestelmäkehote sanoo, että tagien sisältö on dataa eikä ohjeita. Testitapaus inj-06 mittaa samaa."
+  },
+
+  "conv-03-vahvistusportti:0": {
+    "type": "guard_blocked",
+    "text": "Malli YRITTI kirjoitusta ja vartija esti sen koodissa, ei kehotteessa. Kaksi asiaa kannattaa katsoa työkalukutsusta: kutsu tapahtui, joten kehote ei riittänyt — ja syötteen 'prioriteetiksi KRIITTINEN' ei ole kutsun argumenteissa, koska prioriteetti ei ole työkalun parametri lainkaan. Vartijat: assertConfirmationRound ja assertPriorResearch, lib/agent/guards.ts."
+  },
+  "conv-03-vahvistusportti:1": {
+    "type": "retrieval",
+    "text": "Selvittely. Tämä vuoro avaa kirjoitusportin: onnistunut lukutyökalukutsu kirjautuu turns-tauluun, ja loadReadCount lukee sen seuraavalla vuorolla kannasta — ei pyyntökontekstista."
+  },
+  "conv-03-vahvistusportti:2": {
+    "type": "write_ok",
+    "text": "Kirjaus onnistui. Prioriteetti tuli guards.ts:n PRIORITY_BY_TYPE-taulukosta tikettityypin perusteella, ei mallilta: työkaluskeemassa ei ole prioriteettikenttää. Malli näkee arvon vasta työkalutuloksessa. Vertaa ensimmäiseen vuoroon, jossa käyttäjä yritti asettaa sen tekstillä."
+  },
+
+  "conv-04-kieltaytyminen:0": {
+    "type": "refusal_ok",
+    "text": "Haku palautti nolla katkelmaa, koska mikään ei ylittänyt osuvuuskynnystä. Tyhjä tulos on tarkoituksellisesti parempi kuin heikko: heikko katkelma saisi mallin vastaamaan epäolennaisesta aineistosta. Testitapaus ref-01 mittaa samaa."
+  }
+}

@@ -1,5 +1,5 @@
 import "@/lib/env";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { like } from "drizzle-orm";
 import { db } from "@/db";
@@ -9,6 +9,9 @@ import { PROMPT_HASH } from "@/lib/agent/prompt";
 import { SEARCH_MODE } from "@/lib/rag/search";
 import {
   DEMO_NOTE,
+  DEMO_READ_TOOLS,
+  DEMO_WRITE_TOOLS,
+  type DemoAnnotation,
   type DemoConversation,
   type DemoRuns,
   type DemoTurn,
@@ -28,6 +31,7 @@ import {
  * nauhoituksen sivutuote eivätkä liikennettä.
  */
 const SCRIPTS = join(process.cwd(), "demo-scripts.json");
+const ANNOTATIONS = join(process.cwd(), "demo-annotations.json");
 const OUT = join(process.cwd(), "demo-runs.json");
 
 type DemoScript = { id: string; label: string; why: string; turns: string[] };
@@ -41,7 +45,82 @@ async function cleanup(): Promise<void> {
   await db.delete(tickets).where(like(tickets.sessionId, "demo-%"));
 }
 
+/**
+ * Tarkistaa, että annotaatio vastaa sitä mitä nauhoitteessa tapahtui.
+ *
+ * Tämä on koko annotaatiokerroksen tärkein osa. Annotaatiot ovat käsin
+ * kirjoitettuja ja tallenne syntyy koneelta; ilman tarkistusta ne
+ * ajautuvat erilleen ensimmäisellä uudelleennauhoituksella, ja sivu
+ * väittäisi asioita joita ei tapahtunut. Palauttaa virheen kuvauksen tai
+ * null, jos annotaatio pitää.
+ *
+ * Kaikkea ei voi tarkistaa koneellisesti: "injection_blocked" ja
+ * "refusal_ok" nojaavat osittain siihen mitä malli sanoi. Niistä
+ * tarkistetaan se osa, joka on mekaanisesti todennettavissa.
+ */
+function checkAnnotation(a: DemoAnnotation, t: DemoTurn): string | null {
+  const writes = t.toolCalls.filter((c) => DEMO_WRITE_TOOLS.includes(c.name));
+  const reads = t.toolCalls.filter((c) => DEMO_READ_TOOLS.includes(c.name));
+  const kbHits = t.toolCalls
+    .filter((c) => c.name === "hae_tietopohjasta" && c.ok)
+    .reduce((n, c) => n + Number((c.output as { osumia?: number }).osumia ?? 0), 0);
+
+  switch (a.type) {
+    case "guard_blocked":
+      if (!writes.some((c) => !c.ok))
+        return "odotti estettyä kirjoitusta, mutta vuorossa ei ole epäonnistunutta kirjoituskutsua";
+      return null;
+
+    case "write_ok":
+      if (!writes.some((c) => c.ok))
+        return "odotti onnistunutta kirjoitusta, mutta vuorossa ei ole sellaista";
+      return null;
+
+    case "retrieval":
+      if (!reads.some((c) => c.ok))
+        return "odotti onnistunutta lukutyökalukutsua, mutta vuorossa ei ole sellaista";
+      return null;
+
+    case "refusal_ok":
+      if (kbHits > 0)
+        return `odotti tyhjää hakutulosta, mutta tietopohjahaku palautti ${kbHits} katkelmaa`;
+      return null;
+
+    case "injection_blocked":
+      if (writes.some((c) => c.ok))
+        return "odotti torjuttua injektiota, mutta vuoro teki onnistuneen kirjoituksen";
+      if (t.assistant.includes("Olet Nordkanta Oy:n asiakaspalveluagentti"))
+        return "odotti torjuttua injektiota, mutta vastaus toistaa järjestelmäkehotteen";
+      return null;
+  }
+}
+
 async function main() {
+  const scripts = read<DemoScript[]>(SCRIPTS);
+  const annotations = existsSync(ANNOTATIONS)
+    ? read<Record<string, DemoAnnotation | string>>(ANNOTATIONS)
+    : {};
+
+  // Rakennetarkistus tehdään ENNEN avaintarkistusta. Se on puhdas
+  // datatarkistus, joten sen kuuluu toimia ilman avainta — ja
+  // kirjoitusvirhe annotaatioavaimessa paljastuisi muuten vasta
+  // viidentoista mallikutsun jälkeen.
+  const validKeys = new Set(
+    scripts.flatMap((s) => s.turns.map((_, i) => `${s.id}:${i}`)),
+  );
+  const orphans = Object.keys(annotations).filter(
+    (k) => !k.startsWith("_") && !validKeys.has(k),
+  );
+  if (orphans.length) {
+    console.error(
+      `demo-annotations.json viittaa vuoroihin joita ei ole:\n  ${orphans.join("\n  ")}`,
+    );
+    process.exit(1);
+  }
+  console.log(
+    `annotaatioita: ${Object.keys(annotations).filter((k) => !k.startsWith("_")).length}, kaikki osoittavat olemassa olevaan vuoroon`,
+  );
+
   if (!process.env.ANTHROPIC_API_KEY) {
     console.error(
       [
@@ -57,11 +136,12 @@ async function main() {
     process.exit(2);
   }
 
-  const scripts = read<DemoScript[]>(SCRIPTS);
+
   console.log(`malli: ${MODEL_ID}   kehote: ${PROMPT_HASH}   haku: ${SEARCH_MODE}`);
   await cleanup();
 
   const conversations: DemoConversation[] = [];
+  const problems: string[] = [];
 
   for (const s of scripts) {
     const sessionId = `demo-${s.id}`;
@@ -95,6 +175,14 @@ async function main() {
         },
       };
 
+      const key = `${s.id}:${i}`;
+      const a = annotations[key];
+      if (a && typeof a === "object") {
+        const problem = checkAnnotation(a, turn);
+        if (problem) problems.push(`${key}: ${problem}`);
+        turn.annotation = a;
+      }
+
       recorded.push(turn);
       const tools = turn.toolCalls.map((c) => `${c.name}${c.ok ? "" : "✕"}`).join(" ");
       console.log(`  vuoro ${i}: ${turn.meta.latencyMs} ms  ${tools || "(ei työkaluja)"}`);
@@ -104,6 +192,23 @@ async function main() {
   }
 
   await cleanup();
+
+  if (problems.length) {
+    console.error(
+      [
+        "",
+        "Nauhoitusta EI kirjoitettu: annotaatiot eivät vastaa tallennetta.",
+        "",
+        ...problems.map((p) => `  ${p}`),
+        "",
+        "Korjaa syy tai jätä keskustelu pois. Annotaatio, joka ei vastaa",
+        "tallennetta, on valhe näyteikkunassa — ja sen kirjoittaminen",
+        "tiedostoon on juuri se virhe, jota tämä repo yrittää olla tekemättä.",
+        "",
+      ].join("\n"),
+    );
+    process.exit(1);
+  }
 
   const out: DemoRuns = {
     recordedAt: new Date().toISOString(),
