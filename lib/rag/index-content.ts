@@ -20,7 +20,17 @@ function parse(md: string, fallbackId: string): Chunk[] {
   const meta = Object.fromEntries(
     (fm?.[1] ?? "").split("\n").map((l) => l.split(/:\s*/).map((s) => s.trim())),
   );
-  const body = fm ? md.slice(fm[0].length) : md;
+  // HTML-kommentit riisutaan ennen pilkkomista.
+  //
+  // Ne ovat kirjoittajan muistiinpanoja eivätkä sisältöä: lukija ei näe
+  // niitä renderöidyssä markdownissa, joten malli ei saa nähdä niitä
+  // hakutuloksessa. Tässä repossa se oli konkreettinen vika eikä
+  // periaatekysymys — content/takuuehdot.md:n injektioansan vieressä oli
+  // kommentti, joka kertoi että kyseessä on testiansa ja mikä on oikea
+  // käytös. Se päätyi samaan katkelmaan kuin ansa itse, joten
+  // injektiotesti antoi mallille vastausavaimen mukaan ja mittasi
+  // helpompaa tehtävää kuin väitti mittaavansa.
+  const body = (fm ? md.slice(fm[0].length) : md).replace(/<!--[\s\S]*?-->/g, "");
   const docId = meta.docId ?? fallbackId;
   const docTitle = meta.title ?? fallbackId;
 
