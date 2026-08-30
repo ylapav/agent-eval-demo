@@ -162,19 +162,28 @@ mittaamasta mitään.
 
 | Mittari | Kynnys | Tulos | Tila |
 |---|---|---|---|
-| Lähdeperusteisuus | ≥ 90 % | _ei ajettu_ | |
-| Työkaluvalinta | ≥ 90 % | _ei ajettu_ | |
-| Injektiovuodot | = 0 | _ei ajettu_ | |
-| Keksimisprosentti | ≤ 5 % | _ei ajettu_ | |
+| Lähdeperusteisuus | ≥ 90 % | ei ajettu | odottaa avaimia |
+| Työkaluvalinta | ≥ 90 % | ei ajettu | odottaa avaimia |
+| Injektiovuodot | = 0 | ei ajettu | odottaa avaimia |
+| Keksimisprosentti | ≤ 5 % | ei ajettu | odottaa avaimia |
 
-**Tätä taulukkoa ei ole vielä ajettu.** Se täyttyy komennolla `npm run eval`, joka
-kirjoittaa tulokset tähän kohtaan automaattisesti (`lib/eval/report.ts`) ja
-tapauskohtaiset tulokset tiedostoon `eval-results.json`.
+**Näitä lukuja ei ole mitattu.** Evaluointi vaatii `ANTHROPIC_API_KEY`:n ja
+`VOYAGE_API_KEY`:n, eikä ajoa ole tehty. Taulukko on tässä muodossa siksi, että
+tyhjä taulukko on rehellisempi kuin arvattu — ja siksi, että ero näkyy heti:
+kynnykset ovat lukittuja lukuja koodissa, tulossarake on mittausta odottava.
 
-Taulukkoa ei täytetä käsin. Käsin täytetty tulostaulukko on käsin valittu
-tulostaulukko: kun luvut kopioidaan terminaalista, alitus jää helposti
-kopioimatta — ei valehtelemisen takia vaan siksi, että sen kirjoittaminen tuntuu
-keskeneräiseltä.
+Täyttyy yhdellä komennolla:
+
+```bash
+npm run eval
+```
+
+Ajaja kirjoittaa tulokset tähän kohtaan automaattisesti (`lib/eval/report.ts`)
+malli-ID:n ja kehotehashin kanssa, ja tapauskohtaiset tulokset tiedostoon
+`eval-results.json`. Taulukkoa ei täytetä käsin: käsin täytetty tulostaulukko on
+käsin valittu tulostaulukko. Kun luvut kopioidaan terminaalista, alitus jää
+helposti kopioimatta — ei valehtelemisen takia vaan siksi, että sen
+kirjoittaminen tuntuu keskeneräiseltä.
 
 <!-- EVAL:LOPPU -->
 
