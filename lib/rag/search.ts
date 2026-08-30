@@ -65,26 +65,31 @@ export const RELEVANCE_FLOOR_VECTOR = 0.35;
  * ────────────────────────────────────────────────────────────────────────
  * MITATTU 2026-08-30, n=24 kyselyä (`npm run calibrate`).
  *
- * Tulos: JAKAUMAT MENEVÄT PÄÄLLEKKÄIN eikä mikään kynnys erota niitä.
+ * Tulos 1: jakaumat menevät päällekkäin eikä mikään kynnys erota niitä.
  *
  *   pitäisi löytyä (14 kyselyä)  0,017 – 0,076
  *   ei saa löytyä  (10 kyselyä)  0,015 – 0,038
  *
- * Tämä luku ei siis ole kalibroitu erotusraja, koska sellaista ei ole
- * olemassa. Se on tietoinen valinta saantiin päin: 0,01 päästää läpi
- * kaikki 14 osuvaa kyselyä ja karsii 2 osumatonta kymmenestä. Vaihtoehto
- * olisi tarkkuus (kynnys 0,039 karsisi kaikki osumattomat mutta myös 8
- * osuvaa neljästätoista), ja silloin demo kieltäytyisi vastaamasta
- * useimpiin oikeisiin kysymyksiin.
+ * Tulos 2, mitattu katkelmatasolla erikseen: kynnys 0,01 on tässä
+ * aineistossa käytännössä INERTTI hylkäyssuunnassa. Se ei karsi yhtäkään
+ * kymmenestä kyselystä, joiden ei pitäisi löytää mitään — koko
+ * "ei saa löytyä" -jakauma on kynnyksen yläpuolella. Ainoa mitattava
+ * vaikutus on kolmen osuvan kyselyn katkelmamäärän pieneneminen; yksikään
+ * ei tyhjene kokonaan.
+ *
+ * Luku on siis saantiin päin valittu eikä kalibroitu erotusraja, ja se
+ * suojaa vähemmän kuin kynnys yleensä suojaa. Vaihtoehto olisi tarkkuus
+ * (0,039 karsisi kaikki osumattomat mutta myös 8 osuvaa neljästätoista),
+ * ja silloin demo kieltäytyisi vastaamasta useimpiin oikeisiin
+ * kysymyksiin.
  *
  * Lukua EI ole viilattu testisetin väliin sopivaksi. Päällekkäisillä
- * jakaumilla se olisi ylisovittamista: luku näyttäisi kalibroidulta
- * ilman että se erottaa mitään.
+ * jakaumilla se olisi ylisovittamista: luku näyttäisi kalibroidulta ilman
+ * että se erottaa mitään.
  *
- * Oikea korjaus on haussa eikä kynnyksessä. Tämä on empiirinen perustelu
- * hybridihaulle, joka on README:n jatkotöissä: leksikaalinen löytää
- * tarkat termit, vektorihaku merkityksen, ja kumpikaan yksin ei erota
- * "Kuka on toimitusjohtaja?" -tyyppistä kysymystä tästä korpuksesta.
+ * Tämä on koko repon vahvin empiirinen perustelu hybridihaulle, joka on
+ * README:n jatkotöissä. Pelkkä leksikaalinen haku ei erottele tätä
+ * aineistoa, eikä korjaus ole tässä luvussa.
  * ────────────────────────────────────────────────────────────────────────
  */
 export const RELEVANCE_FLOOR_LEXICAL = 0.01;
@@ -98,9 +103,26 @@ export const RELEVANCE_FLOOR =
  *
  * `finnish` löytyy sekä PGliten WASM-buildista että tavallisesta
  * Postgresista — tarkistettu ajamalla `SELECT cfgname FROM pg_ts_config`.
- * Se on `simple`-konfiguraatiota selvästi parempi, koska suomessa haettava
- * sana on lähes aina eri taivutusmuodossa kuin tekstissä: "kattopelleillä"
- * ja "kattopelti" ovat sama sana vain stemmerin kanssa.
+ * Se on `simple`-konfiguraatiota parempi, koska suomessa haettava sana on
+ * lähes aina eri taivutusmuodossa kuin tekstissä: "julkisivulevyt" ja
+ * "julkisivulevy" saavat saman vartalon 'julkisivulevy', samoin "takuuta"
+ * ja "takuu" vartalon 'taku'.
+ *
+ * Se ei kuitenkaan riitä, ja rajan tunteminen on tärkeämpää kuin voiton:
+ * snowball ei osaa astevaihtelua, joten se HALKAISEE osan sanoista.
+ * Mitattu 2026-08-30:
+ *
+ *   kattopelti      → 'kattopelt'
+ *   kattopellit     → 'kattopel'      (eri vartalo!)
+ *   toimitusaika    → 'toimitusaik'
+ *   toimitusajat    → 'toimitusaj'    (eri vartalo!)
+ *
+ * Seuraus on mitattava eikä teoreettinen: kysely perusmuodossa
+ * "kattopelti" osuu yhteen katkelmaan, kun "kattopellit" osuu yhdeksään.
+ * Tietopohjan sanasto hajoaa kahtia juuri demon päätuotteen kohdalla.
+ * Tämä on toinen puoli samasta johtopäätöksestä kuin kynnys alempana:
+ * leksikaalinen haku yksin ei kanna tätä aineistoa, ja korjaus on
+ * hybridihaku — vektorihaku ei välitä astevaihtelusta lainkaan.
  */
 const TS_CONFIG = "finnish";
 

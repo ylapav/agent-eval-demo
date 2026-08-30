@@ -10,7 +10,7 @@ import {
   type Chunk,
   type EmbeddingsFile,
 } from "./chunker";
-import { embedDocuments, canEmbed, EMBED_MODEL } from "./embed";
+import { embedDocuments, canEmbed, EMBED_MODEL, EMBED_DIMENSIONS } from "./embed";
 
 /**
  * Indeksoi content/*.md kantaan. Kolme tapaa hankkia upotukset:
@@ -25,12 +25,64 @@ import { embedDocuments, canEmbed, EMBED_MODEL } from "./embed";
  * on todellinen tila, ja nollavektori olisi valhe joka tuottaisi
  * kosinietäisyyksiä jotka näyttävät luvuilta.
  */
+const NL = String.fromCharCode(10);
+
 type Mode = "voyage" | "esilaskettu" | "ei-upotuksia";
+
+/**
+ * Tarkistaa esilasketun tiedoston muodon. Palauttaa syyn tai null.
+ *
+ * Sama periaate kuin embed.ts:n dimensiotarkistuksessa: väärä vektori on
+ * hiljainen virhe, joka näkyy vain huonoina hakutuloksina. Erona se, että
+ * tämä polku on nimenomaan se, joka ajetaan ILMAN avainta — eli se jota
+ * kukaan ei ole tarkistamassa.
+ */
+function validate(): string | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(EMBEDDINGS_PATH, "utf8"));
+  } catch (e) {
+    return `ei ole kelvollista JSONia: ${e instanceof Error ? e.message : String(e)}`;
+  }
+
+  const f = raw as Partial<EmbeddingsFile>;
+  if (!f || typeof f !== "object") return "ei ole objekti";
+  if (typeof f.model !== "string") return "kentta 'model' puuttuu";
+  if (f.dimensions !== EMBED_DIMENSIONS)
+    return `dimensio on ${f.dimensions}, odotettiin ${EMBED_DIMENSIONS}`;
+  if (f.model !== EMBED_MODEL)
+    return `laskettu mallilla ${f.model}, koodi odottaa mallia ${EMBED_MODEL}`;
+  if (!f.vectors || typeof f.vectors !== "object") return "kentta 'vectors' puuttuu";
+
+  const eka = Object.values(f.vectors)[0];
+  if (eka !== undefined && (!Array.isArray(eka) || eka.length !== EMBED_DIMENSIONS))
+    return `vektorin pituus on ${Array.isArray(eka) ? eka.length : "tuntematon"}, odotettiin ${EMBED_DIMENSIONS}`;
+
+  return null;
+}
 
 function resolveMode(): { mode: Mode; file: EmbeddingsFile | null } {
   if (canEmbed()) return { mode: "voyage", file: null };
 
   if (existsSync(EMBEDDINGS_PATH)) {
+    // Tiedosto validoidaan ennen käyttöä. Pelkkä olemassaolo ei riitä:
+    // keskeytynyt `npm run embed` jättää juuri tällaisen puolikkaan
+    // tiedoston, ja ilman tarkistusta se kaatoi koko `npm run setup`:n
+    // selittämättömään TypeErroriin. Repon kärkilupaus on että setup
+    // toimii ilman avaimia, joten se ei saa hajota siihen.
+    const ongelma = validate();
+    if (ongelma) {
+      console.warn(
+        [
+          "",
+          `VAROITUS: content/embeddings.json ei kelpaa (${ongelma}).`,
+          "Indeksoidaan ilman upotuksia ja haku käyttää leksikaalista polkua.",
+          "Korjaus: aja `npm run embed` uudelleen avaimen kanssa.",
+          "",
+        ].join(NL),
+      );
+      return { mode: "ei-upotuksia", file: null };
+    }
     const file = JSON.parse(readFileSync(EMBEDDINGS_PATH, "utf8")) as EmbeddingsFile;
     return { mode: "esilaskettu", file };
   }

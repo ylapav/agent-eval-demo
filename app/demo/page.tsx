@@ -21,8 +21,36 @@ export const metadata: Metadata = {
 
 const RUNS = join(process.cwd(), "demo-runs.json");
 
+/**
+ * Lukee tallenteen, tai palauttaa syyn miksi ei voinut.
+ *
+ * Rikkinäistä tiedostoa ei saa heittää ulos renderistä: sivu
+ * esirenderöityy staattisesti, joten heitto kaataisi koko `next build`:in
+ * eikä vain tätä reittiä — myös lupauksen että setup ja dev toimivat ilman
+ * avaimia. Tiedosto syntyy ulkopuolisesta prosessista (`npm run record`)
+ * ja voi jäädä puolikkaaksi, joten se on odotettavissa oleva tila.
+ *
+ * Sivun oma perustelu ("käsin kirjoitettua varatilaa ei ole") koskee
+ * sisältöä, ei virheilmoitusta.
+ */
+function lataa(): { runs: DemoRuns } | { virhe: string | null } {
+  if (!existsSync(RUNS)) return { virhe: null };
+  try {
+    const raw = JSON.parse(readFileSync(RUNS, "utf8")) as DemoRuns;
+    if (!Array.isArray(raw?.conversations) || !raw.conversations.length)
+      return { virhe: "tiedostossa ei ole yhtään keskustelua" };
+    if (typeof raw.recordedAt !== "string")
+      return { virhe: "kentta 'recordedAt' puuttuu" };
+    return { runs: raw };
+  } catch (e) {
+    return { virhe: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export default function DemoPage() {
-  if (!existsSync(RUNS)) {
+  const tulos = lataa();
+
+  if (!("runs" in tulos)) {
     return (
       <div className="wrap">
         <header className="site">
@@ -32,10 +60,21 @@ export default function DemoPage() {
           </span>
         </header>
         <p className="notice">
-          Tallennetta ei ole. Tiedosto <span className="mono">demo-runs.json</span> syntyy
-          komennolla <span className="mono">npm run record</span>, joka ajaa
-          keskustelut <span className="mono">demo-scripts.json</span>:ista oikealla
-          mallilla ja vaatii <span className="mono">ANTHROPIC_API_KEY</span>:n.
+          {tulos.virhe === null ? (
+            <>
+              Tallennetta ei ole. Tiedosto{" "}
+              <span className="mono">demo-runs.json</span> syntyy komennolla{" "}
+              <span className="mono">npm run record</span>, joka ajaa keskustelut{" "}
+              <span className="mono">demo-scripts.json</span>:ista oikealla mallilla
+              ja vaatii <span className="mono">ANTHROPIC_API_KEY</span>:n.
+            </>
+          ) : (
+            <>
+              Tallenne on olemassa mutta ei ole luettavissa:{" "}
+              <span className="mono">{tulos.virhe}</span>. Aja{" "}
+              <span className="mono">npm run record</span> uudelleen.
+            </>
+          )}
         </p>
         <p className="hint">
           Käsin kirjoitettua varatilaa ei ole tarkoituksella: tallenteen on oltava
@@ -45,7 +84,7 @@ export default function DemoPage() {
     );
   }
 
-  const runs = JSON.parse(readFileSync(RUNS, "utf8")) as DemoRuns;
+  const { runs } = tulos;
 
   return (
     <div className="wrap wrap--wide">

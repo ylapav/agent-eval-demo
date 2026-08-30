@@ -6,12 +6,18 @@ Ei Dockeria, ei pilvitiliä, ei avaimia: tietokanta on PGlite (Postgres
 WASM-muodossa) ja haku käyttää Postgresin tekstihakua, kun upotusavainta ei ole.
 Agentin vastaaminen vaatii `ANTHROPIC_API_KEY`:n — kaikki muu ei.
 
-**Haluatko vain nähdä sen toiminnassa?** `/demo` toistaa neljä tallennettua
-keskustelua työkalukutsuineen, katkelmineen ja osuvuuspisteineen. Se on
-**tallenne eikä elävä ajo**: sivu lukee `demo-runs.json`:in eikä kutsu mallia
-lainkaan, joten sen katselu ei maksa mitään. Tallenne syntyy komennolla
-`npm run record`, ja [tests/demo-cost.test.ts](tests/demo-cost.test.ts) kaatuu
-jos reitin riippuvuuspuuhun ilmestyy Anthropic-SDK.
+**`/demo`** on tarkoitettu toistamaan neljä tallennettua keskustelua
+työkalukutsuineen, katkelmineen ja osuvuuspisteineen. Se on **tallenne eikä
+elävä ajo**: sivu lukee `demo-runs.json`:in eikä kutsu mallia lainkaan, joten
+sen katselu ei maksa mitään, ja
+[tests/demo-cost.test.ts](tests/demo-cost.test.ts) kaatuu jos reitin
+riippuvuuspuuhun ilmestyy Anthropic-SDK.
+
+**Tallennetta ei ole vielä tehty.** `demo-runs.json` ei ole versionhallinnassa,
+koska nauhoitus vaatii `ANTHROPIC_API_KEY`:n eikä käsin kirjoitettua vastausta
+kirjoiteta tallenteeseen. Tuoreessa kloonauksessa `/demo` näyttää siis ohjeen
+eikä keskusteluja. Tallenne syntyy komennolla `npm run record`, ja koska sivu
+esirenderöityy staattisesti, se vaatii uuden käännöksen.
 
 Suomenkielinen asiakaspalveluagentti kuvitteelliselle
 rakennustarvikevalmistajalle: se vastaa takuu- ja toimitusehdoista
@@ -116,9 +122,14 @@ totta.
 
 Leksikaalinen polku käyttää Postgresin tekstihakua konfiguraatiolla `finnish`.
 PGliten WASM-buildista löytyy suomen stemmer — tarkistettu ajamalla
-`SELECT cfgname FROM pg_ts_config` — ja se on olennainen, koska suomessa
-haettava sana on lähes aina eri taivutusmuodossa kuin tekstissä:
-"kattopelleillä" ja "kattopelti" ovat sama sana vain stemmerin kanssa.
+`SELECT cfgname FROM pg_ts_config` — ja se auttaa: "julkisivulevyt" ja
+"julkisivulevy" saavat saman vartalon, samoin "takuuta" ja "takuu".
+
+Se ei kuitenkaan riitä, ja raja on mitattu. Snowball ei osaa astevaihtelua,
+joten se halkaisee osan sanoista: `kattopelti` → `kattopelt` mutta
+`kattopellit` → `kattopel`. Seuraus näkyy hauissa — kysely perusmuodossa
+"kattopelti" osuu yhteen katkelmaan, "kattopellit" yhdeksään. Demon päätuotteen
+sanasto siis hajoaa kahtia.
 
 **Nämä eivät ole toistensa varmuuskopioita vaan hybridihaun puolikkaat.**
 Vektorihaku löytää merkityksen ja pettää tuotenumeroilla ja tarkoilla termeillä;
@@ -130,20 +141,32 @@ Kynnykset ovat erikseen (`RELEVANCE_FLOOR_VECTOR`, `RELEVANCE_FLOOR_LEXICAL`),
 koska `ts_rank` ei ole kosinisimilaarisuus eikä niiden arvoja voi verrata.
 Leksikaalinen kynnys on **mitattu** (`npm run calibrate`, n=24 kyselyä):
 jakaumat menevät päällekkäin — pitäisi-löytyä 0,017–0,076 ja ei-saa-löytyä
-0,015–0,038 — joten erotusrajaa ei ole olemassa. Luku 0,01 on tietoinen valinta
-saantiin päin eikä kalibroitu kynnys, ja sama lukee koodissa. Pelkkä
-leksikaalinen haku ei siis erottele tätä aineistoa, ja korjaus on hybridihaku
-eikä luvun säätäminen.
+0,015–0,038 — joten erotusrajaa ei ole olemassa. Katkelmatasolla mitattuna luku
+0,01 on tässä aineistossa **inertti hylkäyssuunnassa**: se ei karsi yhtäkään
+kymmenestä kyselystä, joiden ei pitäisi löytää mitään, ja ainoa mitattava
+vaikutus on kolmen osuvan kyselyn katkelmamäärän pieneneminen. Luku on siis
+saantiin päin valittu eikä kalibroitu kynnys, ja sama lukee koodissa.
+
+Yhdessä stemmerin astevaihteluongelman kanssa tämä on repon vahvin empiirinen
+perustelu hybridihaulle: pelkkä leksikaalinen haku ei erottele tätä aineistoa,
+eikä korjaus ole kynnyksen säätämisessä.
 
 ### Vercel
 
-Tuo repo Verceliin ja aseta ympäristömuuttujat: `DATABASE_URL` (Neon),
-`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `AGENT_WEBHOOK_SECRET`, `ADMIN_PASSWORD`.
+**Julkiseen versioon riittää `DATABASE_URL` (Neon) ja `ADMIN_PASSWORD`.** Jätä
+`ANTHROPIC_API_KEY` asettamatta: silloin `/demo` toimii täysin ja `/` kertoo
+ettei agentti ole konfiguroitu — eikä yksikään kävijä voi aiheuttaa
+mallikutsua. Perustelu on kohdassa
+[Mitä ei ole toteutettu](#mitä-ei-ole-toteutettu).
+
+Täysi toiminnallisuus vaatii lisäksi `ANTHROPIC_API_KEY`:n ja
+`VOYAGE_API_KEY`:n, mutta silloin päätepiste on maksullinen ja auki, eikä
+repossa ole nopeusrajoitusta.
 Aja `npm run setup` kerran paikallisesti Neonin URL:lla osoittaen, jotta skeema
 ja tietopohja ovat paikallaan. Muuta konfiguraatiota ei tarvita.
 
-`AGENT_WEBHOOK_SECRET` tarvitaan vain jos ajat webhookia. Julkinen versio ei
-tarjoile sitä — katso [Mitä ei ole toteutettu](#mitä-ei-ole-toteutettu).
+`AGENT_WEBHOOK_SECRET` asetetaan vain paikallisesti. Ilman sitä `/api/agent`
+hylkää jokaisen pyynnön, mikä on julkisen version haluttu tila.
 
 PGlite pysyy riippuvuuspuussa mutta ei käytössä, koska `DATABASE_URL` osoittaa
 Neoniin. Se on merkitty ulkoiseksi paketiksi `next.config.ts`:ssä — muuten
@@ -399,9 +422,17 @@ Tietoisia rajauksia:
   julkisesti. Julkinen päätepiste vaatisi nopeusrajoituksen, kustannuskaton ja
   salaisuuden kierrätyksen; ilman niitä jaettu salaisuus on yhden vuodon päässä
   siitä, että kuka tahansa ajaa mallia laskuun.
-- **Ei nopeusrajoitusta eikä kustannuskattoa.** Kumpaakaan ei tarvita, koska
-  julkinen pinta ei kutsu mallia ajonaikana: `/demo` on tallenne. Ne tulisivat
-  samassa työssä kuin julkinen webhook.
+- **Ei nopeusrajoitusta eikä kustannuskattoa.** Tämä rajaa sen, mitä repoa saa
+  julkaista. `/demo` on tallenne eikä kutsu mallia, mutta juurireitti `/` on
+  autentikoimaton chat, joka kutsuu — ja `/demo` linkittää siihen. Jos repo
+  julkaistaan `ANTHROPIC_API_KEY`:n kanssa, kuka tahansa kävijä voi ajaa mallia
+  laskuun yhdellä klikkauksella, eikä koodissa ole mitään joka estäisi sen.
+
+  Julkaisuun tarkoitettu versio ajetaan **ilman** `ANTHROPIC_API_KEY`:tä:
+  silloin `/demo` toimii täysin ja `/` kertoo ettei agentti ole
+  konfiguroitu. Nopeusrajoitus ja kustannuskatto ovat edellytys sille, että
+  chat voi olla julkisesti auki, ja ne tulisivat samassa työssä kuin julkinen
+  webhook. Tätä ei pidä lukea niin, ettei niitä tarvittaisi.
 - **Ei striimausta.** Vastaus tulee kerralla. Käyttökokemus kärsii, mitattavuus ei.
 - **Ei palvelinpuolen fallback-mallia.** Kieltäytyminen käsitellään omana
   lopputuloksenaan (`stop_reason: "refusal"`), mutta varamalliin ei siirrytä.

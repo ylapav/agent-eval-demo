@@ -9,6 +9,19 @@ import { estimateCostUsd, specFor } from "./models";
 
 const anthropic = new Anthropic();
 
+/**
+ * Yksi rivi käynnistyksessä, kun avain puuttuu.
+ *
+ * Ilman tätä ensimmäinen chat-viesti palauttaa "Tekninen häiriö. Yritä
+ * hetken kuluttua uudelleen." eikä syy näy missään konsolissa — vain
+ * turns.error-sarakkeessa kannassa. Käyttäjää kehotetaan yrittämään
+ * uudelleen tilanteessa, joka ei korjaannu koskaan itsestään. Haku ja
+ * tietokanta loggaavat oman tilansa samalla tavalla.
+ */
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.log("[agent] ANTHROPIC_API_KEY puuttuu — agentti ei vastaa");
+}
+
 export const MODEL_ID = process.env.MODEL_ID ?? "claude-opus-5";
 export const EFFORT = (process.env.EFFORT ?? "medium") as
   | "low"
@@ -209,7 +222,13 @@ export async function runAgent(opts: {
     }
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
-    finalText = "Tekninen häiriö. Yritä hetken kuluttua uudelleen.";
+    // Konfiguraatiovirhe erotellaan ohimenevästä häiriöstä. "Yritä hetken
+    // kuluttua uudelleen" on väärä ohje tilanteessa, joka ei korjaannu
+    // ilman ympäristömuuttujaa.
+    finalText =
+      e instanceof Anthropic.AuthenticationError || !process.env.ANTHROPIC_API_KEY
+        ? "Agenttia ei ole konfiguroitu: ANTHROPIC_API_KEY puuttuu tai on virheellinen. Tämä on ylläpidon asia, ei sinun."
+        : "Tekninen häiriö. Yritä hetken kuluttua uudelleen.";
   }
 
   const costUsd = estimateCostUsd(MODEL_ID, usage);
