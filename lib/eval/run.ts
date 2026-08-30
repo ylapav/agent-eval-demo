@@ -321,11 +321,17 @@ async function evalRefusal(): Promise<SuiteResult> {
     const g = await scoreGroundedness(r.text, chunks);
 
     // Keksiminen = tosiasiaväitteitä, joita katkelmat eivät tue.
-    const hallucinated = g.total > 0 && g.supported < g.total;
+    //
+    // Arvioijan hajoaminen lasketaan keksimiseksi. Muuten se laskettaisiin
+    // puhtaaksi tulokseksi: hajonnut arvioija palauttaa nolla väitettä, ja
+    // nolla väitettä näyttää tässä kaavassa vastaukselta jossa ei ole mitään
+    // tukematonta. Rikkinäinen mittari ei saa parantaa lukua.
+    const hallucinated = g.judgeFailed || (g.total > 0 && g.supported < g.total);
 
     rows.push({
       id: c.id,
       keksi: hallucinated,
+      arvioija_hajosi: g.judgeFailed,
       katkelmia: chunks.length,
       vaitteita: g.total,
       tukematta: g.unsupported,

@@ -89,13 +89,17 @@ Väärin kuvattu suoja on huonompi kuin puuttuva suoja, koska siihen luotetaan.
 
 **Rakenteelliset rajat — pitävät riippumatta siitä mitä malli päättää:**
 
-1. **Prioriteetti johdetaan tikettityypistä** (`derivePriority`). Malli ei aseta
-   prioriteettia eikä näe sen arvoa. Ainoa vaikutuskanava on tyypin valinta, ja
-   tyyppi on suljettu joukko.
+1. **Prioriteetti johdetaan tikettityypistä** (`derivePriority`). Työkaluskeemassa
+   ei ole prioriteettikenttää, joten malli ei voi asettaa sitä. Ainoa
+   vaikutuskanava on tyypin valinta, ja tyyppi on suljettu joukko — mutta
+   `reklamaatio` ja `takuu` tuottavat molemmat `high`, joten kanava on aito ja
+   `inj-11` mittaa sitä. Malli myös näkee lopputuloksen: työkalutulos palauttaa
+   `prioriteetti`-kentän takaisin kontekstiin.
 2. **Kirjoitus ei suoriudu keskustelun ensimmäisellä mallivuorolla**
    (`assertConfirmationRound`). Asiakas ei ole voinut nähdä yhteenvetoa eikä
    vahvistaa mitään, joten vahvistusta ei ole olemassa riippumatta siitä, mitä
-   viestissä lukee. Tämä sulkee kaikki yhden viestin injektiot.
+   viestissä lukee. Tämä sulkee kaikki yhden viestin injektiot, jotka vaativat
+   kirjoituksen; tekstitason vuotoihin se ei vaikuta.
 3. **Kirjoitus vaatii aiemman onnistuneen lukutyökalukutsun**
    (`assertPriorResearch`, laskuri `loadReadCount` kannasta). Aito soittopyyntö
    tai tiketti syntyy jonkin selvittelyn jälkeen; suora hyppy kirjoitukseen ei

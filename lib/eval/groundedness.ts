@@ -23,6 +23,8 @@ export type GroundednessResult = {
   supported: number;
   score: number;
   unsupported: string[];
+  /** Arvioija ei palauttanut kelvollista JSONia. Tulos ei ole mittaus. */
+  judgeFailed: boolean;
 };
 
 /**
@@ -60,7 +62,18 @@ export async function scoreGroundedness(
     parsed = JSON.parse(raw);
   } catch {
     // Arvioijan epäonnistuminen ei saa näyttää hyvältä tulokselta.
-    return { total: 0, supported: 0, score: 0, unsupported: ["ARVIOIJA_EPAONNISTUI"] };
+    //
+    // score 0 hoitaa sen lähdeperusteisuudessa, mutta ei riitä yksin:
+    // kieltäytymismittari päättelee keksimisen väitteiden määrästä, ja
+    // total 0 näyttää siellä puhtaalta vastaukselta. Siksi epäonnistuminen
+    // on oma lippunsa eikä pääteltävissä luvuista.
+    return {
+      total: 0,
+      supported: 0,
+      score: 0,
+      unsupported: ["ARVIOIJA_EPAONNISTUI"],
+      judgeFailed: true,
+    };
   }
 
   const claims = parsed.vaitteet ?? [];
@@ -76,5 +89,6 @@ export async function scoreGroundedness(
     // "voin varata soiton" on täysin kelvollinen vastaus.
     score: claims.length === 0 ? 1 : supported.length / claims.length,
     unsupported,
+    judgeFailed: false,
   };
 }

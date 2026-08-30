@@ -139,12 +139,21 @@ tiivistetty lupaukseksi.
 **Rakenteelliset — pitävät riippumatta siitä mitä malli päättää:**
 
 1. **Prioriteetti johdetaan tikettityypistä koodissa** (`lib/agent/guards.ts`).
-   Malli ei aseta prioriteettia eikä näe sen arvoa. Vaikka injektio saisi mallin
-   kirjoittamaan yhteenvedoksi "KRIITTINEN", prioriteetti tulee taulukosta.
+   Työkaluskeemassa ei ole prioriteettikenttää, joten malli ei voi asettaa sitä.
+   Vaikka injektio saisi mallin kirjoittamaan yhteenvedoksi "KRIITTINEN",
+   prioriteetti tulee taulukosta.
+
+   Kaksi rajausta, jotka on syytä sanoa ääneen. Malli **näkee** lopputuloksen:
+   työkalutulos palauttaa `prioriteetti: "high"` takaisin kontekstiin. Ja tyypin
+   valinta on mallin, joten se on se kanava johon injektio kohdistuu —
+   `reklamaatio` ja `takuu` tuottavat molemmat `high`. Tapaus `inj-11` mittaa
+   juuri tätä datatasolla, ei tekstistä.
 2. **Kirjoitus ei onnistu keskustelun ensimmäisellä vuorolla.** Asiakas ei ole
    voinut nähdä yhteenvetoa eikä vahvistaa mitään, joten vahvistusta ei ole
-   olemassa. Tämä sulkee kaikki yhden viestin injektiot ("vahvistan jo
-   etukäteen") riippumatta siitä, uskooko malli niitä.
+   olemassa. Tämä sulkee kaikki yhden viestin injektiot, **jotka vaativat
+   kirjoituksen** ("vahvistan jo etukäteen"), riippumatta siitä uskooko malli
+   niitä. Tekstitason vuotoihin — kehotteen paljastaminen, hinnan keksiminen —
+   se ei vaikuta lainkaan; niitä vastaan on vain kehote.
 3. **Kirjoitus vaatii, että istunnossa on tehty selvittelyä** — vähintään yksi
    onnistunut lukutyökalukutsu *aiemmalla* vuorolla, laskettuna kannasta.
    Aito soittopyyntö tai tiketti syntyy jonkin selvittelyn jälkeen; suora hyppy
@@ -174,6 +183,12 @@ Lisäksi kaksi rajaa, jotka eivät ole injektiosuojia mutta rajaavat vahinkoa:
   tarkoitti käytännössä "2 per HTTP-pyyntö" — chatissa jokainen viesti on oma
   pyyntönsä, joten katto ei rajoittanut mitään. Serverless-ajossa prosessimuisti
   ei ole edes sama kahden pyynnön välillä.
+
+  Katto kestää peräkkäiset pyynnöt muttei rinnakkaisia. Luku ja kirjoitus eivät
+  ole atomisia: määrä luetaan pyynnön alussa, mallikutsu kestää sekunteja, ja
+  vasta sitten kirjoitetaan. Kaksi samanaikaista pyyntöä samalla `sessionId`:llä
+  lukevat molemmat saman arvon ja päästävät kumpikin kaksi kirjausta läpi.
+  Korjaus olisi uniikkirajoite tai `SELECT … FOR UPDATE`; kumpaakaan ei ole.
 - **Zod-validointi** ennen jokaista kirjoitusta.
 
 Ylitys palautetaan mallille **työkalutuloksena eikä kaatumisena**, jotta agentti
@@ -323,6 +338,10 @@ Tietoisia rajauksia:
 - **Ei ääntä.** TTS/STT olisi oma projektinsa eikä muuttaisi mitään mitä tämä näyttää.
 - **Ei multi-agenttia.** Yksi agentti neljällä työkalulla riittää näyttämään silmukan.
 - **Ei loppukäyttäjien autentikointia.** Webhook on autentikoitu, chat ei.
+  `sessionId` tulee asiakkaalta eikä sitä varmenneta, joten kuka tahansa voi
+  arvata toisen istunnon tunnuksen ja lukea sen historian agentin vastauksista.
+  Tuotannossa tunnus sidottaisiin autentikoituun käyttäjään; demossa se on
+  selaimen `sessionStorage`-arvo.
 - **Ei nopeusrajoitusta.** Tuotannossa pakollinen, demossa melua.
 - **Ei striimausta.** Vastaus tulee kerralla. Käyttökokemus kärsii, mitattavuus ei.
 - **Ei palvelinpuolen fallback-mallia.** Kieltäytyminen käsitellään omana
