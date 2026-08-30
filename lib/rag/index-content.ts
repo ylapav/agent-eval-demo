@@ -1,94 +1,126 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import "@/lib/env";
+import { existsSync, readFileSync } from "node:fs";
 import { db } from "@/db";
-import { chunks } from "@/db/schema";
-import { embedDocuments, EMBED_MODE, EMBED_MODEL } from "./embed";
+import { chunks as chunksTable } from "@/db/schema";
+import {
+  readCorpus,
+  chunkKey,
+  embeddableText,
+  EMBEDDINGS_PATH,
+  type Chunk,
+  type EmbeddingsFile,
+} from "./chunker";
+import { embedDocuments, canEmbed, EMBED_MODEL } from "./embed";
 
 /**
- * Indeksoi content/*.md pgvectoriin.
+ * Indeksoi content/*.md kantaan. Kolme tapaa hankkia upotukset:
  *
- * Pilkkominen tapahtuu otsikkotasolla (##), ei merkkimäärällä. Syy: näissä
- * dokumenteissa otsikko kantaa merkityksen ("Mitä takuu ei kata"), ja
- * kiinteä merkkiraja katkaisisi sen keskeltä. Katkelma ilman otsikkoaan
- * on juuri se tapaus, jossa haku palauttaa oikean tekstin väärässä
- * kontekstissa — ja se ei näy missään mittarissa.
+ *   1. VOYAGE_API_KEY asetettu   → lasketaan nyt (tuorein, maksaa)
+ *   2. content/embeddings.json   → luetaan tiedostosta (ilmainen, offline)
+ *   3. ei kumpaakaan             → katkelmat ilman upotuksia
+ *
+ * Kolmas ei ole vika vaan tuettu tila: haku toimii silloin leksikaalisesti
+ * (lib/rag/search.ts). Katkelmat on silti indeksoitava, koska leksikaalinen
+ * haku lukee samaa taulua. Upotussarake on siksi nullable — "ei upotusta"
+ * on todellinen tila, ja nollavektori olisi valhe joka tuottaisi
+ * kosinietäisyyksiä jotka näyttävät luvuilta.
  */
-type Chunk = { docId: string; docTitle: string; heading: string | null; content: string };
+type Mode = "voyage" | "esilaskettu" | "ei-upotuksia";
 
-function parse(md: string, fallbackId: string): Chunk[] {
-  const fm = md.match(/^---\n([\s\S]*?)\n---\n/);
-  const meta = Object.fromEntries(
-    (fm?.[1] ?? "").split("\n").map((l) => l.split(/:\s*/).map((s) => s.trim())),
-  );
-  // HTML-kommentit riisutaan ennen pilkkomista.
-  //
-  // Ne ovat kirjoittajan muistiinpanoja eivätkä sisältöä: lukija ei näe
-  // niitä renderöidyssä markdownissa, joten malli ei saa nähdä niitä
-  // hakutuloksessa. Tässä repossa se oli konkreettinen vika eikä
-  // periaatekysymys — content/takuuehdot.md:n injektioansan vieressä oli
-  // kommentti, joka kertoi että kyseessä on testiansa ja mikä on oikea
-  // käytös. Se päätyi samaan katkelmaan kuin ansa itse, joten
-  // injektiotesti antoi mallille vastausavaimen mukaan ja mittasi
-  // helpompaa tehtävää kuin väitti mittaavansa.
-  const body = (fm ? md.slice(fm[0].length) : md).replace(/<!--[\s\S]*?-->/g, "");
-  const docId = meta.docId ?? fallbackId;
-  const docTitle = meta.title ?? fallbackId;
+function resolveMode(): { mode: Mode; file: EmbeddingsFile | null } {
+  if (canEmbed()) return { mode: "voyage", file: null };
 
-  const out: Chunk[] = [];
-  let heading: string | null = null;
-  let buf: string[] = [];
-
-  const flush = () => {
-    const text = buf.join("\n").trim();
-    if (text.length > 40) out.push({ docId, docTitle, heading, content: text });
-    buf = [];
-  };
-
-  for (const line of body.split("\n")) {
-    if (/^##\s+/.test(line)) {
-      flush();
-      heading = line.replace(/^##\s+/, "").trim();
-      buf.push(line);
-    } else {
-      buf.push(line);
-    }
+  if (existsSync(EMBEDDINGS_PATH)) {
+    const file = JSON.parse(readFileSync(EMBEDDINGS_PATH, "utf8")) as EmbeddingsFile;
+    return { mode: "esilaskettu", file };
   }
-  flush();
-  return out;
+
+  return { mode: "ei-upotuksia", file: null };
+}
+
+function report(mode: Mode, file: EmbeddingsFile | null, missing: Chunk[], total: number) {
+  switch (mode) {
+    case "voyage":
+      console.log(`upotukset: lasketaan nyt (${EMBED_MODEL})`);
+      break;
+    case "esilaskettu":
+      console.log(
+        `upotukset: content/embeddings.json (${file!.model}, laskettu ${file!.generatedAt.slice(0, 10)})`,
+      );
+      if (missing.length) {
+        console.warn(
+          [
+            "",
+            `VAROITUS: ${missing.length}/${total} katkelmaa ilman upotusta.`,
+            "Tietopohjaa on muokattu sen jälkeen kun upotukset laskettiin, joten",
+            "nämä katkelmat eivät löydy vektorihaulla:",
+            ...missing.slice(0, 8).map((c) => `  - ${c.docId} / ${c.heading ?? "(ei otsikkoa)"}`),
+            missing.length > 8 ? `  … ja ${missing.length - 8} muuta` : "",
+            "",
+            "Korjaus: aja `npm run embed` avaimen kanssa.",
+            "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        );
+      }
+      break;
+    case "ei-upotuksia":
+      console.log(
+        [
+          "upotukset: EI YHTÄÄN",
+          "",
+          "VOYAGE_API_KEY puuttuu eikä content/embeddings.json ole olemassa.",
+          "Katkelmat indeksoidaan ilman upotuksia, ja haku toimii leksikaalisesti",
+          "(Postgresin tekstihaku, suomen stemmer). Tämä on tuettu tila eikä virhe:",
+          "demo vastaa kysymyksiin, mutta semanttista hakua ei ole.",
+          "",
+          "Vektorihaku käyttöön kahdella tavalla:",
+          "  - aseta VOYAGE_API_KEY ja aja `npm run index` uudelleen, tai",
+          "  - hanki content/embeddings.json (`npm run embed` avaimen kanssa).",
+          "",
+        ].join("\n"),
+      );
+      break;
+  }
 }
 
 async function main() {
-  const dir = join(process.cwd(), "content");
-  const files = readdirSync(dir).filter((f) => f.endsWith(".md"));
+  const { files, chunks } = readCorpus();
+  const { mode, file } = resolveMode();
 
-  const all = files.flatMap((f) =>
-    parse(readFileSync(join(dir, f), "utf8"), f.replace(/\.md$/, "")),
-  );
+  const missing =
+    mode === "esilaskettu" ? chunks.filter((c) => !file!.vectors[chunkKey(c)]) : [];
 
-  console.log(`upotusmalli: ${EMBED_MODEL}`);
-  if (EMBED_MODE === "local") {
-    console.warn(
-      [
-        "VAROITUS: VOYAGE_API_KEY puuttuu, joten indeksi rakennetaan paikallisella",
-        "tiivisteupotuksella. Putki toimii, haun laatu ei. Evaluointi kieltäytyy",
-        "ajamasta tällä indeksillä.",
-      ].join("\n"),
-    );
-  }
-  console.log(`${files.length} dokumenttia, ${all.length} katkelmaa`);
+  console.log(`${files.length} dokumenttia, ${chunks.length} katkelmaa`);
+  report(mode, file, missing, chunks.length);
 
-  await db.delete(chunks);
+  await db.delete(chunksTable);
 
   const B = 32;
-  for (let i = 0; i < all.length; i += B) {
-    const batch = all.slice(i, i + B);
-    const vecs = await embedDocuments(
-      batch.map((c) => `${c.docTitle} — ${c.heading ?? ""}\n${c.content}`),
-    );
-    await db.insert(chunks).values(batch.map((c, j) => ({ ...c, embedding: vecs[j] })));
-    console.log(`  ${Math.min(i + B, all.length)}/${all.length}`);
+  for (let i = 0; i < chunks.length; i += B) {
+    const batch = chunks.slice(i, i + B);
+
+    let vectors: (number[] | null)[];
+    if (mode === "voyage") {
+      vectors = await embedDocuments(batch.map(embeddableText));
+    } else if (mode === "esilaskettu") {
+      vectors = batch.map((c) => file!.vectors[chunkKey(c)] ?? null);
+    } else {
+      vectors = batch.map(() => null);
+    }
+
+    await db
+      .insert(chunksTable)
+      .values(batch.map((c, j) => ({ ...c, embedding: vectors[j] })));
+    console.log(`  ${Math.min(i + B, chunks.length)}/${chunks.length}`);
   }
+
   console.log("valmis");
+  process.exit(0);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

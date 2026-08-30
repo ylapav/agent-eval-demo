@@ -7,7 +7,8 @@ import { db } from "@/db";
 import { evalRuns, turns } from "@/db/schema";
 import { runAgent, MODEL_ID, EFFORT } from "@/lib/agent/loop";
 import { PROMPT_HASH } from "@/lib/agent/prompt";
-import { EMBED_MODE, EMBED_MODEL } from "@/lib/rag/embed";
+import { EMBED_MODEL } from "@/lib/rag/embed";
+import { SEARCH_MODE, RELEVANCE_FLOOR } from "@/lib/rag/search";
 import { scoreGroundedness, JUDGE_MODEL } from "./groundedness";
 import { THRESHOLDS } from "./thresholds";
 import { writeReadmeResults } from "./report";
@@ -361,15 +362,19 @@ async function main() {
   // Valeupotuksella ajettu evaluointi tuottaisi lukuja, jotka näyttävät
   // mittaustuloksilta mutta eivät ole. Se on huonompi lopputulos kuin
   // ajamatta jättäminen, joten se estetään tässä eikä varoiteta siitä.
-  if (EMBED_MODE === "local") {
+  if (SEARCH_MODE !== "vector") {
     console.error(
       [
         "",
-        "Evaluointia ei ajeta: VOYAGE_API_KEY puuttuu.",
+        "Evaluointia ei ajeta: VOYAGE_API_KEY puuttuu, joten haku on",
+        "leksikaalisella polulla.",
         "",
-        `Indeksi on rakennettu paikallisella tiivisteupotuksella (${EMBED_MODEL}),`,
-        "joka ei ole semanttinen malli. Sen päällä mitatut luvut näyttäisivät",
-        "mittaustuloksilta ilman että ovat sellaisia.",
+        "Kynnykset lib/eval/thresholds.ts:ssä on lukittu vektoripolulle. Samojen",
+        "kynnysten soveltaminen toiseen hakutapaan tuottaisi lukuja, jotka",
+        "näyttävät vertailukelpoisilta edellisten ajojen kanssa mutta eivät ole.",
+        "",
+        "Leksikaalisen polun mittaaminen on oma työnsä: se vaatii omat",
+        "kynnyksensä, jotka lukitaan ennen ensimmäistä ajoa samalla tavalla.",
         "",
         "Aseta VOYAGE_API_KEY ja ANTHROPIC_API_KEY, aja `npm run index`",
         "uudelleen ja aja tämä sitten.",
@@ -386,7 +391,7 @@ async function main() {
 
   console.log(`malli:     ${MODEL_ID} (effort ${EFFORT})`);
   console.log(`arvioija:  ${JUDGE_MODEL}`);
-  console.log(`upotus:    ${EMBED_MODEL}`);
+  console.log(`upotus:    ${EMBED_MODEL} (haku ${SEARCH_MODE}, kynnys ${RELEVANCE_FLOOR})`);
   console.log(`kehote:    ${PROMPT_HASH}\n`);
 
   const results: SuiteResult[] = [];

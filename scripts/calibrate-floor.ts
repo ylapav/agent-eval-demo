@@ -1,17 +1,22 @@
 import "@/lib/env";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { sql, cosineDistance, desc } from "drizzle-orm";
-import { db } from "@/db";
-import { chunks } from "@/db/schema";
-import { embedQuery, EMBED_MODEL, EMBED_MODE } from "@/lib/rag/embed";
-import { RELEVANCE_FLOOR } from "@/lib/rag/search";
+import {
+  searchChunksVector,
+  searchChunksLexical,
+  SEARCH_MODE,
+  RELEVANCE_FLOOR,
+} from "@/lib/rag/search";
+import { EMBED_MODEL } from "@/lib/rag/embed";
 
 /**
  * Osuvuuskynnyksen kalibrointi.
  *
- * RELEVANCE_FLOOR on ainoa luku hakukerroksessa, jota ei voi johtaa
- * mistään — se riippuu upotusmallista, kielestä ja tietopohjan koosta.
+ * Kynnys on ainoa luku hakukerroksessa, jota ei voi johtaa mistään — se
+ * riippuu hakutavasta, upotusmallista, kielestä ja tietopohjan koosta.
+ * Siksi kumpikin polku kalibroidaan erikseen: skripti mittaa sen polun,
+ * joka on käytössä (VOYAGE_API_KEY asetettu → vektori, muuten leksikaalinen),
+ * ja ts_rank-pisteet eivät ole vertailukelpoisia kosinisimilaarisuuden kanssa.
  * Väärin asetettuna se rikkoo kaksi mittaria eri suuntiin: liian matala
  * kynnys päästää epäolennaista kontekstia läpi ja nostaa keksimistä,
  * liian korkea tyhjentää tulokset ja pudottaa lähdeperusteisuuden.
@@ -33,27 +38,30 @@ const read = (f: string): { id: string; viesti: string }[] =>
     (c: { viesti?: string }) => c.viesti,
   );
 
+/**
+ * Paras osuma ILMAN kynnystä.
+ *
+ * Kynnyksen kanssa mittaus olisi kehäpäätelmä: se näyttäisi vain sen, mitä
+ * nykyinen kynnys päästää läpi, eikä sitä mitä kynnykseksi pitäisi asettaa.
+ */
 async function topScore(q: string): Promise<number> {
-  const vec = await embedQuery(q);
-  const similarity = sql<number>`1 - (${cosineDistance(chunks.embedding, vec)})`;
-  const rows = await db
-    .select({ score: similarity })
-    .from(chunks)
-    .orderBy(desc(similarity))
-    .limit(1);
-  return rows[0]?.score ?? 0;
+  const hits =
+    SEARCH_MODE === "vector"
+      ? await searchChunksVector(q, 1, { ignoreFloor: true })
+      : await searchChunksLexical(q, 1, { ignoreFloor: true });
+  return hits[0]?.score ?? 0;
 }
 
-const bar = (v: number) => "█".repeat(Math.max(0, Math.round(v * 40)));
+/** Palkin skaala on eri poluilla, koska pisteiden suuruusluokka on eri. */
+const bar = (v: number) =>
+  "█".repeat(Math.max(0, Math.round(v * (SEARCH_MODE === "vector" ? 40 : 400))));
 
 async function main() {
-  console.log(`upotusmalli: ${EMBED_MODEL}`);
-  if (EMBED_MODE === "local") {
-    console.log(
-      "HUOM: paikallinen tiivisteupotus ei ole semanttinen. Jakaumat eivät\n" +
-        "      kerro mitään oikeasta hakulaadusta — aseta VOYAGE_API_KEY.\n",
-    );
-  }
+  console.log(
+    SEARCH_MODE === "vector"
+      ? `hakupolku: vektori (${EMBED_MODEL})`
+      : "hakupolku: leksikaalinen (Postgresin tekstihaku, suomen stemmer)",
+  );
   console.log(`nykyinen kynnys: ${RELEVANCE_FLOOR}\n`);
 
   const groups: { nimi: string; tiedosto: string; pisteet: number[] }[] = [

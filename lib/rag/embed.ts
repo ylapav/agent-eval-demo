@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 /**
  * Ainoa paikka, joka tietää mitä upotusmallia käytetään.
  *
@@ -7,27 +5,19 @@ import { createHash } from "node:crypto";
  * Jos vaihdat mallia etkä aja indeksointia uudelleen, haku palauttaa hiljaa
  * roskaa: dimensio täsmää mutta vektoriavaruus ei ole sama. Ei virhettä,
  * ei lokiriviä, huonot tulokset.
+ *
+ * Tässä ei ole varamallia. Aiemmin oli: ilman avainta upotukset korvattiin
+ * paikallisella tiivistefunktiolla, jotta putki toimisi offline. Se poistui,
+ * koska sama tarve hoituu rehellisemmin kahdella muulla tavalla —
+ * esilasketut upotukset (`npm run embed`, content/embeddings.json) ja
+ * leksikaalinen hakupolku (lib/rag/search.ts). Kumpikaan ei teeskentele
+ * olevansa semanttinen malli.
  */
-
+export const EMBED_MODEL = "voyage-3-lite";
 export const EMBED_DIMENSIONS = 512;
 
-/**
- * Ilman VOYAGE_API_KEY:tä käytetään paikallista tiivistepohjaista upotusta.
- *
- * Se ei ole malli. Se on determinististä kohinaa, jolla voi tarkistaa että
- * putki toimii — skeema, indeksointi, pgvector, HNSW, hakukynnys ja
- * työkalukutsu — ilman yhtään API-avainta. Haun LAATU on sillä olematon.
- *
- * Siksi lib/eval/run.ts kieltäytyy ajamasta tässä tilassa. Vihreä mittari,
- * joka on tuotettu valeupotuksella, on huonompi kuin mittari jota ei ole:
- * mittaamaton järjestelmä tiedetään mittaamattomaksi, mutta väärin mitattuun
- * luotetaan.
- */
-export const EMBED_MODE: "voyage" | "local" = process.env.VOYAGE_API_KEY
-  ? "voyage"
-  : "local";
-
-export const EMBED_MODEL = EMBED_MODE === "voyage" ? "voyage-3-lite" : "local-hash-dev";
+/** Onko elävä upotuskutsu mahdollinen. Kyselyn upotus vaatii aina avaimen. */
+export const canEmbed = () => Boolean(process.env.VOYAGE_API_KEY);
 
 type VoyageResponse = { data: { embedding: number[] }[] };
 
@@ -35,6 +25,12 @@ async function callVoyage(
   texts: string[],
   inputType: "document" | "query",
 ): Promise<number[][]> {
+  if (!process.env.VOYAGE_API_KEY) {
+    throw new Error(
+      "VOYAGE_API_KEY puuttuu, joten upotusta ei voi laskea. Kyselyn upotus vaatii avaimen aina — esilasketut upotukset kattavat vain katkelmat. Ilman avainta haku käyttää leksikaalista polkua (lib/rag/search.ts).",
+    );
+  }
+
   const res = await fetch("https://api.voyageai.com/v1/embeddings", {
     method: "POST",
     headers: {
@@ -54,35 +50,7 @@ async function callVoyage(
   }
 
   const json = (await res.json()) as VoyageResponse;
-  return json.data.map((d) => d.embedding);
-}
-
-/**
- * Sanatason tiivistys satunnaisprojektioon. Samat sanat → sama vektori,
- * joten osumat ovat toistettavia ja sanaston päällekkäisyys näkyy
- * kosinietäisyydessä. Semantiikkaa siinä ei ole lainkaan.
- */
-function localEmbed(text: string): number[] {
-  const vec = new Float64Array(EMBED_DIMENSIONS);
-  const words = text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
-
-  for (const w of words) {
-    const h = createHash("sha256").update(w).digest();
-    for (let i = 0; i < 8; i++) {
-      const idx = h.readUInt16BE(i * 2) % EMBED_DIMENSIONS;
-      vec[idx] += h[16 + i] % 2 === 0 ? 1 : -1;
-    }
-  }
-
-  let norm = 0;
-  for (const v of vec) norm += v * v;
-  norm = Math.sqrt(norm) || 1;
-  return Array.from(vec, (v) => v / norm);
-}
-
-async function embed(texts: string[], inputType: "document" | "query") {
-  const out =
-    EMBED_MODE === "voyage" ? await callVoyage(texts, inputType) : texts.map(localEmbed);
+  const out = json.data.map((d) => d.embedding);
 
   // Dimensio tarkistetaan joka kutsulla. Halpa tarkistus, estää hiljaisen
   // epäsuhdan indeksin ja kyselyn välillä — se on virheluokka, joka ei
@@ -97,5 +65,6 @@ async function embed(texts: string[], inputType: "document" | "query") {
   return out;
 }
 
-export const embedDocuments = (texts: string[]) => embed(texts, "document");
-export const embedQuery = async (text: string) => (await embed([text], "query"))[0];
+export const embedDocuments = (texts: string[]) => callVoyage(texts, "document");
+export const embedQuery = async (text: string) =>
+  (await callVoyage([text], "query"))[0];

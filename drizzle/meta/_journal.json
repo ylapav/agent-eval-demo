@@ -15,6 +15,13 @@
       "when": 1787926676514,
       "tag": "0001_flawless_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788107387210,
+      "tag": "0002_flippant_joseph",
+      "breakpoints": true
     }
   ]
 }

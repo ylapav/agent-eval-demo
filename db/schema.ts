@@ -23,7 +23,10 @@ export const chunks = pgTable(
     docTitle: text("doc_title").notNull(),
     heading: text("heading"),
     content: text("content").notNull(),
-    embedding: vector("embedding", { dimensions: 512 }).notNull(),
+    /** Nullable: "ei upotusta" on todellinen tila, kun indeksointi ajettiin
+     *  ilman avainta ja ilman esilaskettua tiedostoa. Nollavektori olisi
+     *  valhe, joka tuottaisi kosinietäisyyksiä jotka näyttävät luvuilta. */
+    embedding: vector("embedding", { dimensions: 512 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [

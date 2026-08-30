@@ -66,11 +66,11 @@ Ylimmän komennon jälkeen chat on osoitteessa `/` ja admin-näkymä `/admin`
 (vaatii `ADMIN_PASSWORD`). Ei Dockeria, ei pilvitiliä: `npm run setup` ajaa
 migraatiot, tuotedatan ja tietopohjan indeksoinnin PGliteen.
 
-Mitä ilman avaimia toimii: rakenne, migraatiot, indeksointi, pgvector-haku,
-hakukynnys, työkalukutsujen validointi ja koko turvakerros testeineen. Mitä ei:
-agentti ei vastaa ilman `ANTHROPIC_API_KEY`:tä, ja upotukset korvautuvat
-paikallisella tiivistefunktiolla — evaluointi kieltäytyy ajamasta sen päällä.
-Siitä lisää kohdassa [Valeupotus](#valeupotus).
+Mitä ilman avaimia toimii: rakenne, migraatiot, indeksointi, **leksikaalinen
+haku**, hakukynnys, työkalukutsujen validointi ja koko turvakerros testeineen.
+Mitä ei: agentti ei vastaa ilman `ANTHROPIC_API_KEY`:tä, eikä vektorihaku toimi
+ilman `VOYAGE_API_KEY`:tä. Kummastakin lisää kohdassa
+[Hakutilat](#hakutilat-vektori-ja-leksikaalinen).
 
 Avaimet mukaan:
 
@@ -299,17 +299,13 @@ Tämä on tiedossa oleva puute eikä huomaamatta jäänyt: kieltäytymismittari 
 suoraan tähän lukuun, joten kalibrointi on ensimmäinen asia jonka tekisin. Se ei
 maksa mallikutsuja, vain upotuskutsut.
 
-### Valeupotus
+### Evaluointi ajetaan vain vektoripolulla
 
-Ilman `VOYAGE_API_KEY`:tä `lib/rag/embed.ts` käyttää paikallista
-tiivistepohjaista upotusta. Se ei ole malli vaan determinististä kohinaa, jolla
-voi tarkistaa että putki toimii — skeema, indeksointi, pgvector, HNSW,
-hakukynnys ja työkalukutsu — ilman yhtään API-avainta.
-
-`npm run eval` **kieltäytyy ajamasta siinä tilassa** ja poistuu koodilla 2.
-Vihreä mittari, joka on tuotettu valeupotuksella, on huonompi kuin mittari jota
-ei ole: mittaamaton järjestelmä tiedetään mittaamattomaksi, mutta väärin
-mitattuun luotetaan.
+`npm run eval` **kieltäytyy ajamasta leksikaalisella polulla** ja poistuu
+koodilla 2. Kynnykset `lib/eval/thresholds.ts`:ssä on lukittu vektoripolulle,
+ja samojen kynnysten soveltaminen toiseen hakutapaan tuottaisi lukuja, jotka
+näyttävät vertailukelpoisilta edellisten ajojen kanssa mutta eivät ole.
+Leksikaalisen polun mittaaminen on oma työnsä omine kynnyksineen.
 
 ## Lokitus
 

@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { chunks } from "@/db/schema";
-import { cosineDistance, desc, gt, sql } from "drizzle-orm";
-import { embedQuery } from "./embed";
+import { cosineDistance, desc, gt, isNotNull, and, sql } from "drizzle-orm";
+import { embedQuery, canEmbed } from "./embed";
 
 export type Hit = {
   id: string;
@@ -13,53 +13,194 @@ export type Hit = {
 };
 
 /**
- * Osuvuuskynnys. Alle tämän olevat katkelmat jätetään pois kokonaan.
+ * Hakupolku valitaan avaimen mukaan.
+ *
+ * Katkelmien upotukset voi esilaskea (`npm run embed`), mutta KÄYTTÄJÄN
+ * KYSELYN upotus vaatii API-kutsun joka kerta. Ilman avainta vektorihaku ei
+ * siis toimi lainkaan, olivatpa katkelmat kuinka valmiiksi upotettuja
+ * tahansa. Leksikaalinen polku on se, joka tekee lupauksesta "toimii ilman
+ * API-avaimia" totta.
+ *
+ * Nämä kaksi eivät ole toistensa varmuuskopioita vaan hybridihaun
+ * puolikkaat: vektorihaku löytää merkityksen ja pettää tuotenumeroilla,
+ * leksikaalinen löytää tarkat termit ja pettää synonyymeillä. Yhdistäminen
+ * on README:n jatkotöissä; tässä valitaan toinen kerrallaan.
+ */
+export type SearchMode = "vector" | "lexical";
+
+export const SEARCH_MODE: SearchMode = canEmbed() ? "vector" : "lexical";
+
+console.log(
+  SEARCH_MODE === "vector" ? "[rag] mode=vector" : "[rag] mode=lexical (ei VOYAGE_API_KEY)",
+);
+
+/**
+ * Osuvuuskynnys vektoripolulle. Alle tämän olevat katkelmat jätetään pois.
  *
  * Ilman kynnystä vektorihaku palauttaa aina k parasta, myös silloin kun
  * mikään ei liity kysymykseen. Malli saa silloin epäolennaista kontekstia
  * ja vastaa sen pohjalta — se on suoraan kieltäytymismittarin epäonnistuminen.
- * Tyhjä tulos on parempi kuin huono tulos, koska tyhjä tulos saa mallin
- * sanomaan "en tiedä".
+ * Tyhjä tulos on parempi kuin huono tulos, koska tyhjä saa mallin sanomaan
+ * "en tiedä".
+ *
+ * TÄMÄ LUKU ON ARVATTU, EI MITATTU. Sitä ei ole kalibroitu
+ * voyage-3-lite-upotuksilla. Kalibrointi: `npm run calibrate`. Kun luku on
+ * mitattu, korvaa tämä kappale muodolla "mitattu <pvm>, n=<kyselyä>,
+ * erotteluväli x,xx–y,yy" ja siirrä muutos omaan committiinsa.
+ *
+ * Jos jakaumat menevät päällekkäin, lukua EI säädetä: silloin mikään kynnys
+ * ei erota niitä, ja korjaus on haussa eikä kynnyksessä.
+ */
+export const RELEVANCE_FLOOR_VECTOR = 0.35;
+
+/**
+ * Osuvuuskynnys leksikaaliselle polulle.
+ *
+ * Eri luku kuin vektoripolulla, koska ts_rank ei ole kosinisimilaarisuus.
+ * Se ei ole normalisoitu välille 0–1 eikä vertailukelpoinen sen kanssa:
+ * ts_rank painottaa osumien tiheyttä ja määrää, ja arvot jäävät tämän
+ * kokoisessa korpuksessa suuruusluokkaan 0,01–0,08. Saman luvun käyttäminen
+ * molemmissa hylkäisi leksikaalisella polulla käytännössä kaiken.
  *
  * ────────────────────────────────────────────────────────────────────────
- * TÄMÄ LUKU ON ARVATTU, EI MITATTU.
+ * MITATTU 2026-08-30, n=24 kyselyä (`npm run calibrate`).
  *
- * Sitä ei ole kalibroitu voyage-3-lite-upotuksilla, koska kalibrointiajoa
- * ei ole tehty. Se on lähtöarvaus, joka on siinä siksi, että jokin kynnys
- * on parempi kuin ei kynnystä — ei siksi, että 0,35 olisi oikea luku.
+ * Tulos: JAKAUMAT MENEVÄT PÄÄLLEKKÄIN eikä mikään kynnys erota niitä.
  *
- * Kalibrointi: `npm run calibrate`. Se ajaa groundedness.json- ja
- * refusal.json-kyselyt pelkkänä hakuna ilman mallikutsuja ja tulostaa
- * parhaan osuman jakauman kummallekin joukolle. Kynnys kuuluu niiden
- * väliin. Kun luku on mitattu, korvaa tämä lohko muodolla
- *   "mitattu <pvm>, n=<kyselyä>, erotteluväli x,xx–y,yy"
- * ja siirrä muutos omaan committiinsa perusteluineen.
+ *   pitäisi löytyä (14 kyselyä)  0,017 – 0,076
+ *   ei saa löytyä  (10 kyselyä)  0,015 – 0,038
  *
- * Jos jakaumat menevät päällekkäin, lukua EI säädetä: silloin mikään
- * kynnys ei erota niitä, ja korjaus on haussa (hybridihaku, pilkkominen).
- * Kynnyksen viilaaminen päällekkäisillä jakaumilla on ylisovittamista
- * testisettiin.
+ * Tämä luku ei siis ole kalibroitu erotusraja, koska sellaista ei ole
+ * olemassa. Se on tietoinen valinta saantiin päin: 0,01 päästää läpi
+ * kaikki 14 osuvaa kyselyä ja karsii 2 osumatonta kymmenestä. Vaihtoehto
+ * olisi tarkkuus (kynnys 0,039 karsisi kaikki osumattomat mutta myös 8
+ * osuvaa neljästätoista), ja silloin demo kieltäytyisi vastaamasta
+ * useimpiin oikeisiin kysymyksiin.
+ *
+ * Lukua EI ole viilattu testisetin väliin sopivaksi. Päällekkäisillä
+ * jakaumilla se olisi ylisovittamista: luku näyttäisi kalibroidulta
+ * ilman että se erottaa mitään.
+ *
+ * Oikea korjaus on haussa eikä kynnyksessä. Tämä on empiirinen perustelu
+ * hybridihaulle, joka on README:n jatkotöissä: leksikaalinen löytää
+ * tarkat termit, vektorihaku merkityksen, ja kumpikaan yksin ei erota
+ * "Kuka on toimitusjohtaja?" -tyyppistä kysymystä tästä korpuksesta.
  * ────────────────────────────────────────────────────────────────────────
  */
-export const RELEVANCE_FLOOR = 0.35;
+export const RELEVANCE_FLOOR_LEXICAL = 0.01;
 
-export async function searchChunks(query: string, k = 5): Promise<Hit[]> {
+/** Voimassa oleva kynnys. Kalibrointi ja raportointi lukevat tämän. */
+export const RELEVANCE_FLOOR =
+  SEARCH_MODE === "vector" ? RELEVANCE_FLOOR_VECTOR : RELEVANCE_FLOOR_LEXICAL;
+
+/**
+ * Tekstihakukonfiguraatio.
+ *
+ * `finnish` löytyy sekä PGliten WASM-buildista että tavallisesta
+ * Postgresista — tarkistettu ajamalla `SELECT cfgname FROM pg_ts_config`.
+ * Se on `simple`-konfiguraatiota selvästi parempi, koska suomessa haettava
+ * sana on lähes aina eri taivutusmuodossa kuin tekstissä: "kattopelleillä"
+ * ja "kattopelti" ovat sama sana vain stemmerin kanssa.
+ */
+const TS_CONFIG = "finnish";
+
+/** Katkelman haettava teksti. Otsikko mukaan, koska se kantaa merkityksen. */
+const DOC = sql`(${chunks.docTitle} || ' ' || coalesce(${chunks.heading}, '') || ' ' || ${chunks.content})`;
+
+const COLUMNS = {
+  id: chunks.id,
+  docId: chunks.docId,
+  docTitle: chunks.docTitle,
+  heading: chunks.heading,
+  content: chunks.content,
+};
+
+/**
+ * Kyselyn muunto tsquery-muotoon TypeScriptin puolella.
+ *
+ * Syy tehdä se täällä eikä SQL:ssä: to_tsquery on tiukka syntaksistaan ja
+ * kaatuu käyttäjän vapaaseen tekstiin (kysymysmerkit, sulut, väliviivat).
+ * plainto_tsquery ei kaadu mutta yhdistää sanat AND-operaattorilla, jolloin
+ * "Kuinka pitkä takuu kattopelleillä on?" ei osuisi mihinkään: yhdenkään
+ * katkelman ei tarvitse sisältää kaikkia sanoja.
+ *
+ * Tässä sanat poimitaan kirjaimiksi ja numeroiksi ja yhdistetään OR:lla.
+ * Poiminta on samalla sanitointi: yksikään erikoismerkki ei pääse läpi.
+ */
+function queryWords(query: string): string[] {
+  const words = query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  return [...new Set(words.filter((w) => w.length > 1))];
+}
+
+/**
+ * `ignoreFloor` on vain kalibrointia varten: kynnyksen mittaaminen kynnyksen
+ * läpi olisi kehäpäätelmä, joka näyttäisi vain mitä nykyinen luku päästää
+ * läpi eikä sitä mitä luvun pitäisi olla.
+ */
+export type SearchOptions = { ignoreFloor?: boolean };
+
+/** Vektorihaku. Vaatii sekä katkelmien että kyselyn upotukset. */
+export async function searchChunksVector(
+  query: string,
+  k = 5,
+  opts: SearchOptions = {},
+): Promise<Hit[]> {
   const vec = await embedQuery(query);
   const similarity = sql<number>`1 - (${cosineDistance(chunks.embedding, vec)})`;
 
-  const rows = await db
-    .select({
-      id: chunks.id,
-      docId: chunks.docId,
-      docTitle: chunks.docTitle,
-      heading: chunks.heading,
-      content: chunks.content,
-      score: similarity,
-    })
+  return db
+    .select({ ...COLUMNS, score: similarity })
     .from(chunks)
-    .where(gt(similarity, RELEVANCE_FLOOR))
+    // Upotus voi puuttua, jos indeksointi ajettiin ilman avainta ja ilman
+    // esilaskettua tiedostoa. NULL ei saa osallistua etäisyyslaskentaan.
+    .where(
+      and(
+        isNotNull(chunks.embedding),
+        opts.ignoreFloor ? undefined : gt(similarity, RELEVANCE_FLOOR_VECTOR),
+      ),
+    )
     .orderBy(desc(similarity))
     .limit(k);
+}
 
-  return rows;
+/**
+ * Leksikaalinen haku Postgresin tekstihaulla. Ei vaadi API-avainta.
+ *
+ * Sama paluumuoto kuin vektorihaulla, jotta työkalukerros ei tiedä kummalla
+ * polulla se on. Pisteet eivät ole vertailukelpoisia keskenään — siksi
+ * kynnykset ovat erikseen.
+ *
+ * Indeksiä ei ole: 83 katkelmalla sekventiaalinen skannaus kestää
+ * millisekunteja. Ensimmäinen asia jonka lisäisin korpuksen kasvaessa on
+ * GIN-indeksi lausekkeelle to_tsvector('finnish', …).
+ */
+export async function searchChunksLexical(
+  query: string,
+  k = 5,
+  opts: SearchOptions = {},
+): Promise<Hit[]> {
+  const terms = queryWords(query);
+  if (!terms.length) return [];
+  const q = terms.join(" | ");
+
+  const rank = sql<number>`ts_rank(to_tsvector(${TS_CONFIG}, ${DOC}), to_tsquery(${TS_CONFIG}, ${q}))`;
+
+  return db
+    .select({ ...COLUMNS, score: rank })
+    .from(chunks)
+    .where(
+      and(
+        sql`to_tsvector(${TS_CONFIG}, ${DOC}) @@ to_tsquery(${TS_CONFIG}, ${q})`,
+        opts.ignoreFloor ? undefined : gt(rank, RELEVANCE_FLOOR_LEXICAL),
+      ),
+    )
+    .orderBy(desc(rank))
+    .limit(k);
+}
+
+/** Työkalukerroksen käyttämä haku. Polku on valittu käynnistyksessä. */
+export async function searchChunks(query: string, k = 5): Promise<Hit[]> {
+  return SEARCH_MODE === "vector"
+    ? searchChunksVector(query, k)
+    : searchChunksLexical(query, k);
 }
