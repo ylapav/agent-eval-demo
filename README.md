@@ -253,8 +253,14 @@ kuuluu niiden väliin. **Jos jakaumat menevät päällekkäin, mikään kynnys e
 niitä**, ja korjaus on haussa (hybridihaku, pilkkominen) eikä luvun säätämisessä.
 Kynnyksen viilaaminen päällekkäisillä jakaumilla on ylisovittamista testisettiin.
 
-Nykyinen arvo `0.35` on lähtöarvaus, ei mitattu. Se on kalibroitava oikeilla
-upotuksilla ennen kuin evaluointituloksiin voi luottaa.
+**Nykyinen arvo `0.35` on arvattu, ei mitattu.** Sitä ei ole kalibroitu
+voyage-3-lite-upotuksilla. Se on siinä siksi, että jokin kynnys on parempi kuin
+ei kynnystä — ei siksi, että 0,35 olisi oikea luku. Sama lukee koodissa
+(`lib/rag/search.ts`), jotta lukija ei löydä väitettä vain toisesta paikasta.
+
+Tämä on tiedossa oleva puute eikä huomaamatta jäänyt: kieltäytymismittari nojaa
+suoraan tähän lukuun, joten kalibrointi on ensimmäinen asia jonka tekisin. Se ei
+maksa mallikutsuja, vain upotuskutsut.
 
 ### Valeupotus
 

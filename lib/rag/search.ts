@@ -20,6 +20,26 @@ export type Hit = {
  * ja vastaa sen pohjalta — se on suoraan kieltäytymismittarin epäonnistuminen.
  * Tyhjä tulos on parempi kuin huono tulos, koska tyhjä tulos saa mallin
  * sanomaan "en tiedä".
+ *
+ * ────────────────────────────────────────────────────────────────────────
+ * TÄMÄ LUKU ON ARVATTU, EI MITATTU.
+ *
+ * Sitä ei ole kalibroitu voyage-3-lite-upotuksilla, koska kalibrointiajoa
+ * ei ole tehty. Se on lähtöarvaus, joka on siinä siksi, että jokin kynnys
+ * on parempi kuin ei kynnystä — ei siksi, että 0,35 olisi oikea luku.
+ *
+ * Kalibrointi: `npm run calibrate`. Se ajaa groundedness.json- ja
+ * refusal.json-kyselyt pelkkänä hakuna ilman mallikutsuja ja tulostaa
+ * parhaan osuman jakauman kummallekin joukolle. Kynnys kuuluu niiden
+ * väliin. Kun luku on mitattu, korvaa tämä lohko muodolla
+ *   "mitattu <pvm>, n=<kyselyä>, erotteluväli x,xx–y,yy"
+ * ja siirrä muutos omaan committiinsa perusteluineen.
+ *
+ * Jos jakaumat menevät päällekkäin, lukua EI säädetä: silloin mikään
+ * kynnys ei erota niitä, ja korjaus on haussa (hybridihaku, pilkkominen).
+ * Kynnyksen viilaaminen päällekkäisillä jakaumilla on ylisovittamista
+ * testisettiin.
+ * ────────────────────────────────────────────────────────────────────────
  */
 export const RELEVANCE_FLOOR = 0.35;
 
