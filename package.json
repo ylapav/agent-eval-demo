@@ -20,7 +20,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/guards.test.ts",
+    "test": "tsx --test tests/guards.test.ts tests/demo-cost.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed-products.ts",
