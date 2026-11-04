@@ -34,6 +34,16 @@ const KATKELMA_TAKUU =
 const KATKELMA_TOIMITUS =
   "Pohjois-Suomi (Oulu, Kajaani, Rovaniemi): 4 arkipäivää. Alle 1 000 euron tilauksissa rahti on 89 euroa.";
 
+const KATKELMA_VARASTOINTI = [
+  "Nippua siirretään nostoliinoilla, ei ketjuilla eikä haarukoilla suoraan pintaa vasten. Nippu nostetaan vähintään kahdesta pisteestä, jos pituus ylittää 4 metriä.",
+  "Tuotteet säilytetään irti maasta vähintään 100 millimetrin korkeudella ja kallistettuna niin, että vesi valuu pois nipun välistä.",
+  "Suojamuovi poistetaan viikon kuluessa toimituksesta. Muovin alle tiivistyvä kosteus aiheuttaa valkoruostetta, joka on pysyvä pintavika eikä kuulu takuun piiriin. Tämä on yleisin työmaalla syntyvä vaurio.",
+  "Enimmäissäilytysaika työmaalla ennen asennusta on kolme kuukautta.",
+  "Nippu peitetään hengittävällä suojapeitteellä. Umpinaista muovia ei saa käyttää peitteenä samasta syystä kuin suojamuovi poistetaan.",
+  "Osassa tuotteita on pinnalla kuljetussuojakalvo. Kalvo poistetaan välittömästi asennuksen jälkeen. Auringossa kalvon liima kovettuu kiinni pintaan noin kuukaudessa, minkä jälkeen sitä ei saa pois vahingoittamatta pinnoitetta.",
+  "Levyjä nostetaan pystyasennossa, ei vedetä nipun päältä. Vetäminen naarmuttaa alla olevan levyn pinnan. Naarmu on asennusvaurio.",
+].join(" ");
+
 const PARIT: Pari[] = [
   {
     nimi: "1. täysin tuettu",
@@ -93,6 +103,35 @@ const PARIT: Pari[] = [
     katkelmat: ["Takuu lasketaan toimituspäivästä, ei asennuspäivästä."],
     odotus: (r) => r.unsupported.length > 0,
     selite: "katkelma kieltää juuri sen mitä vastaus väittää",
+  },
+  // Tapaukset 6–7 ovat yhden lauseen mittaisia, ja gpt-4.1-mini läpäisi ne —
+  // mutta käänsi ajossa 1 seitsemän kieltoa gr-10:n luettelomuotoisessa
+  // vastauksessa. Tämä tapaus on se vastaus. Alku sanatarkasti ajon 1
+  // eval-results.json:sta (tallennettu 300 merkkiä); loppuosan luettelo on
+  // rekonstruoitu niistä seitsemästä väitteestä, jotka arvioija käänsi, koska
+  // ajaja ei tallentanut koko vastausta. Katkelma on dokumentti
+  // content/varastointi-tyomaalla.md ilman otsikkotietoja.
+  {
+    nimi: "8. luettelo, useita kieltoja (ajo 1, gr-10)",
+    vastaus: [
+      'Varastointi työmaalla "Varastointi työmaalla" -dokumentin mukaan:',
+      "",
+      "**Sijoittelu:**",
+      "- Tuotteet irti maasta vähintään 100 mm korkeudella",
+      "- Kallistettuna niin, että vesi valuu pois nipun välistä",
+      "",
+      "**Suojaus:**",
+      "- Suojamuovi poistetaan viikon kuluessa toimituksesta (muovin alla tiivistyvä kosteus aiheuttaa valkoruostetta, joka ei kuulu takuun piiriin)",
+      "- Peitteenä hengittävä suojapeite, ei umpinaista muovia",
+      "- Suojakalvo poistetaan heti asennuksen jälkeen — auringossa liima kovettuu noin kuukaudessa, eikä kalvoa sen jälkeen saa pois vahingoittamatta pinnoitetta",
+      "",
+      "**Käsittely:**",
+      "- Nippu siirretään nostoliinoilla, ei ketjuilla eikä haarukoilla suoraan pintaa vasten",
+      "- Levyt nostetaan pystyasennossa, ei vedetä nipun päältä",
+    ].join(String.fromCharCode(10)),
+    katkelmat: [KATKELMA_VARASTOINTI],
+    odotus: (r) => r.total > 0 && r.unsupported.length === 0,
+    selite: "jokainen kielto ja rajaus on katkelmassa — yksikään ei saa kääntyä myöntäväksi",
   },
 ];
 
