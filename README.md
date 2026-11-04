@@ -15,6 +15,12 @@ väärässä. Nordkanta Oy ei ole olemassa ja koko tietopohja on generoitu.
 > RAG with a relevance floor and a lexical fallback, prompt-injection defences, and an
 > evaluation layer with four metrics whose thresholds were locked in git *before* the
 > first run. Runs locally with zero API keys: `npm install && npm run setup && npm run dev`.
+>
+> **Results, honestly:** the first two real runs miss all four locked thresholds, and
+> the README keeps them that way. The evaluation did its job: it showed that the agent
+> answers company questions without retrieving a source, and that the LLM judge itself
+> flipped negations, which a regression case now catches. Next fix: make retrieval
+> structurally required before any factual claim (see *Ajohistoria* and *Mitä tekisin seuraavaksi*).
 
 `npm install && npm run setup && npm run dev` toimii ilman API-avaimia.
 
