@@ -336,6 +336,22 @@ luku, yleisesti tosi mutta ei katkelmissa, ei väitteitä lainkaan, ja sekoitus.
 Jos arvioija erehtyy niissä, se vaihdetaan isompaan ennen sarjan ajoa.
 Arvioijan virhe ei näy mittarissa virheenä vaan lukuna, joka näyttää oikealta.
 
+**Näin kävi ensimmäisellä ajolla.** Alkuperäinen arvioija `gpt-5-nano` sai
+judge-checkissä 2/5 väärin. Toinen virhe oli aito: se luki kieltäytymisen
+yhteydessä tarjotun soittopyynnön tosiasiaväitteeksi (tapaus 4). Toinen paljasti
+virheen testissä itsessään: tapauksen 1 vastaus sanoi kattopeltien takuun
+alkavan "ostopäivästä", mutta katkelma ei sano sitä kattopelleistä. Kolme eri
+arvioijaa hylkäsi väitteen, ja ne olivat oikeassa — gold-merkintä korjattiin,
+ei arvioijaa. Korjatulla parilla `gpt-4.1-mini` läpäisi 5/5, ja se otettiin
+arvioijaksi ennen kuin yhtään mittaria ajettiin. (`gpt-4o-mini` erehtyi
+korjaamattomalla parilla tapauksissa 3 ja 4, joten se ei ollut vaihtoehto.)
+
+Sama ajo löysi vian myös toimittajatarkistuksesta: hintataulusta puuttuva
+malli oletettiin Anthropicin malliksi, joten `gpt-4.1-mini` näytti saman
+toimittajan arvioijalta. Nyt tuntematon malli on virhe — ajaja ja judge-check
+kieltäytyvät koodilla 2 ja nimeävät puuttuvan mallin — koska toimittajaa ei
+voi tarkistaa arvaamalla.
+
 **Työkaluvalinta** mittaa myös kutsumatta jättämistä. Kaksi tapausta on
 tarkoituksella sellaisia, joissa oikea vastaus on olla kutsumatta mitään
 ("Moi", "Kiitos, tämä riitti"). Turha vektorihaku maksaa rahaa ja lisää latenssia

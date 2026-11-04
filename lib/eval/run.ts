@@ -10,7 +10,7 @@ import { PROMPT_HASH } from "@/lib/agent/prompt";
 import { EMBED_MODEL } from "@/lib/rag/embed";
 import { SEARCH_MODE, RELEVANCE_FLOOR } from "@/lib/rag/search";
 import { scoreGroundedness, JUDGE_MODEL, JUDGE_PROVIDER } from "./groundedness";
-import { specFor } from "@/lib/agent/models";
+import { requireModel, UnknownModelError } from "@/lib/agent/models";
 import { THRESHOLDS } from "./thresholds";
 import { writeReadmeResults } from "./report";
 
@@ -394,6 +394,19 @@ async function main() {
   }
   console.log("");
 
+  // Kumpikin malli on oltava hintataulussa ennen mitään muuta: ilman
+  // toimittajaa riippumattomuutta ei voi tarkistaa, ja ilman hintaa
+  // kustannus kirjautuisi nollaksi.
+  let agentProvider: string;
+  let juryProvider: string;
+  try {
+    agentProvider = requireModel(MODEL_ID).provider;
+    juryProvider = requireModel(JUDGE_MODEL).provider;
+  } catch (e) {
+    if (!(e instanceof UnknownModelError)) throw e;
+    console.error(`\nEvaluointia ei ajeta: ${e.message}\n`);
+    process.exit(2);
+  }
 
   // Valeupotuksella ajettu evaluointi tuottaisi lukuja, jotka näyttävät
   // mittaustuloksilta mutta eivät ole. Se on huonompi lopputulos kuin
@@ -431,8 +444,6 @@ async function main() {
   // päätyisivät README:hen, ja niiden vinouma olisi näkymätön jälkikäteen.
   // Saman perheen malli palkitsee juuri niitä muotoiluja joita agentti
   // tuottaa, joten mittari mittaisi osittain itseään.
-  const agentProvider = specFor(MODEL_ID).provider;
-  const juryProvider = specFor(JUDGE_MODEL).provider;
   if (agentProvider === juryProvider) {
     console.error(
       [

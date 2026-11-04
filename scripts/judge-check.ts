@@ -1,5 +1,6 @@
 import "@/lib/env";
 import { scoreGroundedness, JUDGE_MODEL, JUDGE_PROVIDER } from "@/lib/eval/groundedness";
+import { requireModel, UnknownModelError } from "@/lib/agent/models";
 
 /**
  * Tarkistaa arvioijan ennen kuin sillä mitataan mitään.
@@ -76,6 +77,16 @@ const PARIT: Pari[] = [
 ];
 
 async function main() {
+  // Tuntematon malli kieltäytyy ennen avaintarkistusta: virheellinen
+  // asetus kerrotaan ensin, eikä toimittajaa arvata.
+  try {
+    requireModel(JUDGE_MODEL);
+  } catch (e) {
+    if (!(e instanceof UnknownModelError)) throw e;
+    console.error(`Arvioijaa ei testata: ${e.message}`);
+    process.exit(2);
+  }
+
   if (!process.env.OPENAI_API_KEY && JUDGE_PROVIDER === "openai") {
     console.error("OPENAI_API_KEY puuttuu, joten arvioijaa ei voi testata.");
     process.exit(2);

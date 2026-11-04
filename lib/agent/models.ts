@@ -18,9 +18,14 @@ export type ModelSpec = {
   effort: boolean;
   /** Tukeeko adaptiivista ajattelua. */
   thinking: boolean;
-  /** Toimittaja. Evaluoinnin ajaja vaatii, että agentti ja arvioija eroavat. */
-  provider: "anthropic" | "openai";
+  /**
+   * Toimittaja. Evaluoinnin ajaja vaatii, että agentti ja arvioija eroavat.
+   * null vain tuntemattomalla mallilla: toimittajaa ei arvata.
+   */
+  provider: Provider | null;
 };
+
+export type Provider = "anthropic" | "openai";
 
 const A = "anthropic" as const;
 const O = "openai" as const;
@@ -54,6 +59,10 @@ export const MODELS: Record<string, ModelSpec> = {
   "gpt-5-nano": { input: 0.05, output: 0.4, effort: false, thinking: false, provider: O },
   "gpt-4o-mini": { input: 0.15, output: 0.6, effort: false, thinking: false, provider: O },
   "gpt-5.6-luna": { input: 0.2, output: 1.2, effort: false, thinking: false, provider: O },
+  // Hinnasto tarkistettu developers.openai.com/api/docs/pricing 2026-11-04.
+  // Nykyinen arvioija: gpt-5-nano ja gpt-4o-mini erehtyivät judge-checkissä
+  // (2/5), gpt-4.1-mini läpäisi 5/5.
+  "gpt-4.1-mini": { input: 0.4, output: 1.6, effort: false, thinking: false, provider: O },
 };
 
 /**
@@ -63,14 +72,43 @@ export const MODELS: Record<string, ModelSpec> = {
 export const EMBED_PRICE_PER_MTOK = 0.02;
 
 /** Tuntematon malli: ei hinnastoa, ei arvausta. Nolla on väärä luku,
- *  mutta se on näkyvästi väärä. Keksitty hinta olisi näkymättömästi väärä. */
+ *  mutta se on näkyvästi väärä. Keksitty hinta olisi näkymättömästi väärä.
+ *
+ *  Toimittaja on null eikä "anthropic": oletus teki kerran gpt-4.1-ministä
+ *  Anthropicin mallin, ja riippumattomuustarkistus kieltäytyi väärästä
+ *  syystä. Sama oletus toisin päin olisi päästänyt saman toimittajan
+ *  arvioijan läpi. */
 export const UNKNOWN_MODEL: ModelSpec = {
   input: 0,
   output: 0,
   effort: false,
   thinking: false,
-  provider: "anthropic",
+  provider: null,
 };
+
+/** Nimetty virhe, jotta ajaja ja judge-check voivat kieltäytyä siitä
+ *  exit-koodilla 2 eivätkä kaadu yleiseen virheeseen. */
+export class UnknownModelError extends Error {
+  constructor(readonly model: string) {
+    super(`malli ${model} puuttuu hintataulusta: lisää se lib/agent/models.ts:ään`);
+    this.name = "UnknownModelError";
+  }
+}
+
+/**
+ * Mittaamisen polku: tuntematon malli on virhe, ei varoitus.
+ *
+ * Agentin kustannuspolku (specFor) sietää tuntemattoman mallin nollahinnalla,
+ * koska keskeytetty käyttäjän vuoro olisi huonompi kuin väärä kustannusrivi.
+ * Evaluoinnissa tilanne on päinvastainen: ilman toimittajaa
+ * riippumattomuutta ei voi tarkistaa, ja ilman hintaa kulukattoa ei voi
+ * valvoa.
+ */
+export function requireModel(id: string): ModelSpec & { provider: Provider } {
+  const spec = MODELS[id];
+  if (!spec || spec.provider === null) throw new UnknownModelError(id);
+  return spec as ModelSpec & { provider: Provider };
+}
 
 const varoitettu = new Set<string>();
 

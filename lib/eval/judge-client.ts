@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { specFor } from "@/lib/agent/models";
+import { requireModel } from "@/lib/agent/models";
 
 /**
  * Arvioijan yhteys, erillään arvioijan logiikasta.
@@ -17,8 +17,9 @@ export const JUDGE_PROVIDER = (process.env.JUDGE_PROVIDER ?? "openai") as
 
 export const JUDGE_MODEL = process.env.JUDGE_MODEL ?? "gpt-5-nano";
 
-/** Toimittaja mallitaulukosta, ei ympäristöstä: taulukko on totuus. */
-export const judgeProviderOf = (model: string) => specFor(model).provider;
+/** Toimittaja mallitaulukosta, ei ympäristöstä: taulukko on totuus.
+ *  Tuntematon malli heittää UnknownModelError — toimittajaa ei arvata. */
+export const judgeProviderOf = (model: string) => requireModel(model).provider;
 
 type OpenAIChatResponse = {
   choices: { message: { content: string | null } }[];
