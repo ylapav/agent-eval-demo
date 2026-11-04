@@ -1,7 +1,7 @@
 # Nordkanta-agentti
 
-[![ci](https://github.com/OMISTAJA/REPO/actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
-[![eval](https://github.com/OMISTAJA/REPO/actions/workflows/eval.yml/badge.svg)](../../actions/workflows/eval.yml)
+[![ci](https://github.com/ylapav/agent-eval-demo/actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![eval](https://github.com/ylapav/agent-eval-demo/actions/workflows/eval.yml/badge.svg)](../../actions/workflows/eval.yml)
 
 `npm install && npm run setup && npm run dev` toimii ilman API-avaimia.
 
