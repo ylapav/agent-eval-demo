@@ -12,7 +12,7 @@ import { SEARCH_MODE, RELEVANCE_FLOOR } from "@/lib/rag/search";
 import { scoreGroundedness, JUDGE_MODEL, JUDGE_PROVIDER } from "./groundedness";
 import { requireModel, UnknownModelError } from "@/lib/agent/models";
 import { THRESHOLDS } from "./thresholds";
-import { writeReadmeResults } from "./report";
+import { writeReadmeResults, hakuTila, refusalHuomio } from "./report";
 
 /**
  * Yksi vuoro synteettisessä historiassa.
@@ -337,6 +337,12 @@ async function evalRefusal(): Promise<SuiteResult> {
       keksi: hallucinated,
       arvioija_hajosi: g.judgeFailed,
       katkelmia: chunks.length,
+      // Onnistunut hakukutsu. Nolla katkelmaa ilman kutsua ei kerro
+      // kynnyksestä mitään, joten nämä erotetaan huomautuksessa.
+      haku: hakuTila(
+        r.toolCalls.some((t) => t.name === "hae_tietopohjasta" && t.ok),
+        chunks.length,
+      ),
       vaitteita: g.total,
       tukematta: g.unsupported,
       vastaus: r.text.slice(0, 200),
@@ -344,7 +350,6 @@ async function evalRefusal(): Promise<SuiteResult> {
     process.stdout.write(".");
   }
   const rate = rows.filter((r) => r.keksi).length / (rows.length || 1);
-  const empty = rows.filter((r) => r.katkelmia === 0).length;
   return {
     suite: "hallucinationRate",
     otsikko: "Keksimisprosentti",
@@ -353,7 +358,7 @@ async function evalRefusal(): Promise<SuiteResult> {
     lowerIsBetter: true,
     yksikko: "prosentti",
     rows,
-    huomio: `${empty}/${rows.length} tapauksessa hakukynnys palautti tyhjän tuloksen, kuten pitääkin.`,
+    huomio: refusalHuomio(rows.map((r) => r.haku)),
   };
 }
 

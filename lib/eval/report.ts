@@ -11,6 +11,40 @@ export type RunMeta = {
   ajettu: string;
 };
 
+/**
+ * Mitä haulle tapahtui yhdessä kieltäytymistapauksessa.
+ *
+ * - ei_kutsuttu: agentti ei kutsunut hakutyökalua lainkaan
+ * - tyhja:       agentti haki, ja kynnys karsi kaikki osumat
+ * - osumia:      agentti haki ja sai katkelmia
+ */
+export type HakuTila = "ei_kutsuttu" | "tyhja" | "osumia";
+
+export function hakuTila(hakuKutsuttu: boolean, katkelmia: number): HakuTila {
+  if (!hakuKutsuttu) return "ei_kutsuttu";
+  return katkelmia === 0 ? "tyhja" : "osumia";
+}
+
+/**
+ * Kieltäytymissarjan huomautus.
+ *
+ * Aiempi versio päätteli nollasta katkelmasta, että "hakukynnys palautti
+ * tyhjän tuloksen, kuten pitääkin". Ensimmäisessä oikeassa ajossa nolla
+ * johtui siitä, ettei agentti hakenut lainkaan — ja kalibroinnin mukaan haku
+ * olisi palauttanut osumia kynnyksen yläpuolelta. Huomautus kehui kynnystä
+ * asiasta, jota kynnys ei tehnyt. Nämä kolme ovat eri syitä ja eri
+ * korjauksia, joten ne raportoidaan erikseen.
+ */
+export function refusalHuomio(tilat: HakuTila[]): string {
+  const n = (t: HakuTila) => tilat.filter((x) => x === t).length;
+  return [
+    `${tilat.length} tapausta:`,
+    `${n("ei_kutsuttu")} agentti ei kutsunut hakua,`,
+    `${n("tyhja")} haku palautti tyhjän kynnyksen takia,`,
+    `${n("osumia")} haku palautti katkelmia.`,
+  ].join(" ");
+}
+
 const START = "<!-- EVAL:ALKU -->";
 const END = "<!-- EVAL:LOPPU -->";
 
