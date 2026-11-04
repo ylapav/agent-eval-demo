@@ -207,7 +207,7 @@ olla kahta eri versiota, koska silloin evaluointi mittaa vain toista niistä.
 
 | Työkalu | Tyyppi | Kuvaus |
 |---|---|---|
-| `hae_tietopohjasta` | luku | Vektorihaku ehdoista ja ohjeista |
+| `hae_tietopohjasta` | luku | Haku ehdoista ja ohjeista (vektori tai leksikaalinen, ks. Hakutilat) |
 | `hae_tuotteet` | luku | Suodatettu haku tuotetaulusta |
 | `varaa_soitto` | kirjoitus | Soittopyyntö myynnille |
 | `luo_tiketti` | kirjoitus | Tiketti asiakaspalveluun |
@@ -511,8 +511,9 @@ Järjestyksessä:
    Se siirtäisi rajan 3 kehotteesta koodiin.
 4. **Nopeusrajoitus ja kustannuskatto per istunto.** Kirjoituskatto on olemassa,
    lukukatto ei. Kallis silmukka on helppo laukaista.
-5. **Hybridihaku.** Pelkkä vektorihaku pettää tuotenumeroilla ja tarkoilla
-   termeillä. BM25 rinnalle ja tulosten yhdistäminen.
+5. **Hybridihaku.** Vektori- ja leksikaalinen haku ovat jo olemassa, mutta
+   erillisinä polkuina. Ne yhdistetään yhdeksi hauksi (esim. reciprocal rank
+   fusion), jolloin tuotenumerot ja merkitys löytyvät samalla kyselyllä.
 6. **Ihmisen ohitusreitti.** Nyt agentti joko vastaa tai luo tiketin. Väliin
    tarvitaan siirto ihmiselle kesken keskustelun, historia mukana.
 7. **Katkelmatason osumaseuranta.** Mitkä katkelmat päätyvät vastauksiin ja mitkä
@@ -540,8 +541,7 @@ arvioijakutsun jokaisesta vastauksesta. Se ajetaan käsin ennen julkaisua.
 
 Salaisuudet GitHubin secrets-osioon: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`.
 Ilman niitä `eval.yml` ohittaa ajon nimetyllä viestillä eikä epäonnistu
-hiljaa. **Badge-osoitteissa on paikanpitäjä `OMISTAJA/REPO`** — korvaa se
-julkaisun yhteydessä.
+hiljaa.
 
 ## Rakenne
 
