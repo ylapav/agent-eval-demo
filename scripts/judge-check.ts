@@ -74,6 +74,26 @@ const PARIT: Pari[] = [
     odotus: (r) => r.supported > 0 && r.unsupported.length > 0,
     selite: "kaksi tuettua väitettä ja yksi keksitty",
   },
+  // Kieltolauseet. Ensimmäinen oikea ajo paljasti, että arvioija muotoili
+  // kieltävän väitteen myöntäväksi ("ei myy" → "myy") ja tuomitsi sen
+  // sitten tukemattomaksi. Virhe on systemaattinen ja yhteen suuntaan:
+  // se nostaa keksimislukua ja laskee lähdeperusteisuutta juuri niissä
+  // vastauksissa, joissa agentti rajaa oikein. Tapaukset 1–5 eivät sisältäneet
+  // yhtään kieltolausetta, joten tarkistus ei voinut huomata sitä.
+  {
+    nimi: "6. tuettu kieltolause",
+    vastaus: "Nordkanta ei myy aurinkopaneeleita.",
+    katkelmat: ["Nordkanta ei myy aurinkopaneeleita."],
+    odotus: (r) => r.total > 0 && r.unsupported.length === 0,
+    selite: "kieltävä väite on katkelmassa sellaisenaan — polariteetti pitää säilyttää",
+  },
+  {
+    nimi: "7. käänteinen kieltolause",
+    vastaus: "Takuu lasketaan asennuspäivästä.",
+    katkelmat: ["Takuu lasketaan toimituspäivästä, ei asennuspäivästä."],
+    odotus: (r) => r.unsupported.length > 0,
+    selite: "katkelma kieltää juuri sen mitä vastaus väittää",
+  },
 ];
 
 async function main() {
