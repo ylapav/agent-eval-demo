@@ -45,10 +45,19 @@ console.log(
  * Tyhjä tulos on parempi kuin huono tulos, koska tyhjä saa mallin sanomaan
  * "en tiedä".
  *
- * TÄMÄ LUKU ON ARVATTU, EI MITATTU. Sitä ei ole kalibroitu
- * OpenAI-upotuksilla. Kalibrointi: `npm run calibrate`. Kun luku on
- * mitattu, korvaa tämä kappale muodolla "mitattu <pvm>, n=<kyselyä>,
- * erotteluväli x,xx–y,yy" ja siirrä muutos omaan committiinsa.
+ * Mitattu 2026-11-04, n=24 kyselyä (text-embedding-3-small, 512 ulott.),
+ * paras osuma per kysely:
+ *   pitäisi löytyä (groundedness.json, 14):  0,543–0,759
+ *   ei saa löytyä  (refusal.json, 10):       0,403–0,534
+ *   erotteluväli 0,534–0,543 (0,009)
+ *
+ * Arvo 0,35 on molempien jakaumien alapuolella, eli se ei karsi yhtään
+ * kieltäytymiskysymysten osumaa. Sitä ei silti siirretty väliin: 0,009:n rako
+ * on 24 kysymyksen testisetin ominaisuus eikä haun, ja kynnyksen asettaminen
+ * siihen olisi ylisovittamista. Tulos sanoo, että pelkkä kosinisimilaarisuus
+ * ei erota joukkoja luotettavasti; korjaus on haussa (hybridihaku,
+ * pilkkominen), ei tässä luvussa. Sama perustelu: README, "Hakukynnys ja sen
+ * kalibrointi". Kalibrointi: `npm run calibrate`.
  *
  * Jos jakaumat menevät päällekkäin, lukua EI säädetä: silloin mikään kynnys
  * ei erota niitä, ja korjaus on haussa eikä kynnyksessä.
