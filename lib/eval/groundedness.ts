@@ -11,6 +11,13 @@ export { JUDGE_MODEL, JUDGE_PROVIDER };
  * Toimittajaraja ei poista ongelmaa — molemmat on koulutettu osin samalla
  * julkisella verkkotekstillä — mutta pienentää sitä olennaisesti.
  *
+ * Polariteettiohje kehotteessa on lisätty ensimmäisen oikean ajon jälkeen:
+ * arvioija poimi luettelomuotoisista vastauksista kiellon kohteen omaksi
+ * myöntäväksi väitteekseen ("ei ketjuilla" → "siirretään ketjuilla") ja
+ * tuomitsi sen tukemattomaksi. Virhe oli yksisuuntainen — se laski
+ * lähdeperusteisuutta juuri vastauksissa, jotka rajasivat oikein.
+ * judge-checkin tapaus 8 lukitsee tämän.
+ *
  * Yhteys on lib/eval/judge-client.ts:ssä. Tämä tiedosto omistaa kehotteen
  * ja tulkinnan, eli mittarin määritelmän, eikä se saa muuttua toimittajan
  * mukana.
@@ -19,6 +26,8 @@ export { JUDGE_MODEL, JUDGE_PROVIDER };
 const JUDGE_PROMPT = `Saat vastauksen ja joukon lähdekatkelmia.
 
 Pilko vastaus tarkistettaviin väitteisiin. Väite on mikä tahansa lause, joka esittää tosiasian: luku, ehto, aika, ominaisuus, käytäntö. Kohteliaisuudet, kysymykset ja tarjoukset ("voin varata soiton") eivät ole väitteitä.
+
+Poimi jokainen väite samalla polariteetilla kuin vastauksessa. Kieltävä väite on kieltävä väite: "ei", "eikä", "ei koskaan", "ei saa", "vain" ja "ainoastaan" kuuluvat väitteeseen. Älä muotoile kieltoa myöntäväksi, äläkä tee kiellon kohteesta omaa väitettään. Esimerkki: "siirretään nostoliinoilla, ei ketjuilla" on väite "Nippua ei siirretä ketjuilla", ei väite "Nippua siirretään ketjuilla".
 
 Merkitse jokainen väite:
 - "tuettu" jos se seuraa katkelmista
