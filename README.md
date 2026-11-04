@@ -46,28 +46,19 @@ saamaan, ja mittari lakkaa mittaamasta mitään.
 
 | Mittari | Kynnys | Tulos | Tila |
 |---|---|---|---|
-| Lähdeperusteisuus | ≥ 90 % | ei ajettu | odottaa avaimia |
-| Työkaluvalinta | ≥ 90 % | ei ajettu | odottaa avaimia |
-| Injektiovuodot | = 0 | ei ajettu | odottaa avaimia |
-| Keksimisprosentti | ≤ 5 % | ei ajettu | odottaa avaimia |
+| Lähdeperusteisuus | ≥ 90.0 % | **91.5 %** | täyttyy |
+| Työkaluvalinta | ≥ 90.0 % | **83.3 %** | **ALITUS** |
+| Injektiovuodot | ≤ 0 | **0** | täyttyy |
+| Keksimisprosentti | ≤ 5.0 % | **60.0 %** | **ALITUS** |
 
-**Näitä lukuja ei ole mitattu.** Evaluointi vaatii `ANTHROPIC_API_KEY`:n ja
-`OPENAI_API_KEY`:n, eikä ajoa ole tehty. Taulukko on tässä muodossa siksi, että
-tyhjä taulukko on rehellisempi kuin arvattu — ja siksi, että ero näkyy heti:
-kynnykset ovat lukittuja lukuja koodissa, tulossarake on mittausta odottava.
+- Injektiovuodot: 16 tapausta: 15 ei yrittänyt, 0 vartija esti, 0 vuoti (+1 kirjoitti sallituissa rajoissa) — "vartija esti" on se osuus suojasta joka ei riipu mallista.
+- Keksimisprosentti: 10/10 tapauksessa hakukynnys palautti tyhjän tuloksen, kuten pitääkin.
 
-Täyttyy yhdellä komennolla:
+Ajettu 2026-11-04. Malli `claude-haiku-4-5-20251001` (effort medium), arvioija `gpt-4.1-mini`, upotus `text-embedding-3-small`, kehotteen hash `9fad37f37f0a`.
 
-```bash
-npm run eval
-```
-
-Ajaja kirjoittaa tulokset tähän kohtaan automaattisesti (`lib/eval/report.ts`)
-malli-ID:n ja kehotehashin kanssa, ja tapauskohtaiset tulokset tiedostoon
-`eval-results.json`. Taulukkoa ei täytetä käsin: käsin täytetty tulostaulukko on
-käsin valittu tulostaulukko. Kun luvut kopioidaan terminaalista, alitus jää
-helposti kopioimatta — ei valehtelemisen takia vaan siksi, että sen
-kirjoittaminen tuntuu keskeneräiseltä.
+Taulukon kirjoittaa `npm run eval` (`lib/eval/report.ts`). Sitä ei täytetä käsin,
+koska käsin täytetty tulostaulukko on käsin valittu tulostaulukko.
+Tapauskohtaiset tulokset ovat tiedostossa `eval-results.json`.
 
 <!-- EVAL:LOPPU -->
 
@@ -423,14 +414,23 @@ kuuluu niiden väliin. **Jos jakaumat menevät päällekkäin, mikään kynnys e
 niitä**, ja korjaus on haussa (hybridihaku, pilkkominen) eikä luvun säätämisessä.
 Kynnyksen viilaaminen päällekkäisillä jakaumilla on ylisovittamista testisettiin.
 
-**Vektoripolun arvo `0.35` on arvattu, ei mitattu.** Sitä ei ole kalibroitu
-OpenAI-upotuksilla, koska kalibrointi vaatii `OPENAI_API_KEY`:n. Se on siinä siksi, että jokin kynnys on parempi kuin
-ei kynnystä — ei siksi, että 0,35 olisi oikea luku. Sama lukee koodissa
-(`lib/rag/search.ts`), jotta lukija ei löydä väitettä vain toisesta paikasta.
+**Mitattu 2026-11-04** (`text-embedding-3-small`, 512 ulottuvuutta), paras
+osuma per kysymys:
 
-Tämä on tiedossa oleva puute eikä huomaamatta jäänyt: kieltäytymismittari nojaa
-suoraan tähän lukuun, joten kalibrointi on ensimmäinen asia jonka tekisin. Se ei
-maksa mallikutsuja, vain upotuskutsut.
+| Joukko | Tapauksia | Vaihteluväli |
+|---|---|---|
+| PITÄISI LÖYTYÄ (`groundedness.json`) | 14 | 0,543–0,759 |
+| EI SAA LÖYTYÄ (`refusal.json`) | 10 | 0,403–0,534 |
+
+Jakaumat eivät mene päällekkäin, mutta väli on vain **0,009** (0,534 → 0,543).
+Nykyinen kynnys `0.35` on kummankin jakauman alapuolella, joten se päästää
+kieltäytymiskysymyksiin läpi katkelmia, joiden pisteet ovat 0,40–0,53.
+
+**Kynnystä ei muutettu.** Väliin osuva luku erottaisi juuri nämä 24 kysymystä
+ja tuskin mitään muuta: 0,009:n rako on testisetin ominaisuus, ei haun. Kynnyksen
+asettaminen siihen olisi ylisovittamista, jota yllä varotaan. Tulos kertoo, että
+pelkkä kosinisimilaarisuus ei erota näitä joukkoja luotettavasti, ja korjaus on
+haussa (hybridihaku, pilkkominen), ei luvussa.
 
 ### Evaluointi ajetaan vain vektoripolulla
 
