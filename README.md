@@ -3,6 +3,19 @@
 [![ci](https://github.com/ylapav/agent-eval-demo/actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 [![eval](https://github.com/ylapav/agent-eval-demo/actions/workflows/eval.yml/badge.svg)](../../actions/workflows/eval.yml)
 
+Suomenkielinen asiakaspalveluagentti kuvitteelliselle
+rakennustarvikevalmistajalle: se vastaa takuu- ja toimitusehdoista
+tietopohjasta, hakee hinnat ja saatavuudet tuotetaulusta, varaa soittopyyntöjä
+ja luo tikettejä. Kirjoittavilla operaatioilla on rakenteelliset rajat koodissa
+eikä kehotteessa, ja mukana on evaluointikerros, joka mittaa milloin agentti oli
+väärässä. Nordkanta Oy ei ole olemassa ja koko tietopohja on generoitu.
+
+> **In English:** a production-style Finnish customer-service agent for a fictional
+> company. Tool use with structural write limits enforced in code (not in the prompt),
+> RAG with a relevance floor and a lexical fallback, prompt-injection defences, and an
+> evaluation layer with four metrics whose thresholds were locked in git *before* the
+> first run. Runs locally with zero API keys: `npm install && npm run setup && npm run dev`.
+
 `npm install && npm run setup && npm run dev` toimii ilman API-avaimia.
 
 Ei Dockeria, ei pilvitiliä, ei avaimia: tietokanta on PGlite (Postgres
@@ -22,13 +35,6 @@ kirjoiteta tallenteeseen. Tuoreessa kloonauksessa `/demo` näyttää siis ohjeen
 eikä keskusteluja. Tallenne syntyy komennolla `npm run record`, ja koska sivu
 esirenderöityy staattisesti, se vaatii uuden käännöksen.
 
-Suomenkielinen asiakaspalveluagentti kuvitteelliselle
-rakennustarvikevalmistajalle: se vastaa takuu- ja toimitusehdoista
-tietopohjasta, hakee hinnat ja saatavuudet tuotetaulusta, varaa soittopyyntöjä
-ja luo tikettejä. Kirjoittavilla operaatioilla on rakenteelliset rajat koodissa
-eikä kehotteessa, ja mukana on evaluointikerros, joka mittaa milloin agentti oli
-väärässä. Nordkanta Oy ei ole olemassa ja koko tietopohja on generoitu.
-
 ## Tulokset
 
 Neljä mittaria. **Kynnykset lukittiin ennen ensimmäistä ajoa** tiedostoon
@@ -46,7 +52,7 @@ saamaan, ja mittari lakkaa mittaamasta mitään.
 | Keksimisprosentti | ≤ 5 % | ei ajettu | odottaa avaimia |
 
 **Näitä lukuja ei ole mitattu.** Evaluointi vaatii `ANTHROPIC_API_KEY`:n ja
-`VOYAGE_API_KEY`:n, eikä ajoa ole tehty. Taulukko on tässä muodossa siksi, että
+`OPENAI_API_KEY`:n, eikä ajoa ole tehty. Taulukko on tässä muodossa siksi, että
 tyhjä taulukko on rehellisempi kuin arvattu — ja siksi, että ero näkyy heti:
 kynnykset ovat lukittuja lukuja koodissa, tulossarake on mittausta odottava.
 
@@ -69,7 +75,7 @@ Menetelmä on kuvattu kohdassa [Evaluointi](#evaluointi).
 
 ## Pino
 
-Next.js 16 · Postgres + pgvector · Drizzle · Anthropic SDK (tool use) · Voyage-upotukset
+Next.js 16 · Postgres + pgvector · Drizzle · Anthropic SDK (tool use) · OpenAI-upotukset (text-embedding-3-small, 512 ulottuvuutta)
 
 Tietokanta valitaan `DATABASE_URL`:n muodosta: ilman sitä ajetaan PGliteä eli
 Postgresia WASM-muodossa hakemistossa `.data/pg`. Se on oikea Postgres oikealla
@@ -91,13 +97,13 @@ palvelin lukee, eikä kumpikaan kerro siitä mitään. Neon-ajossa rajoitetta ei
 Mitä ilman avaimia toimii: rakenne, migraatiot, indeksointi, **leksikaalinen
 haku**, hakukynnys, työkalukutsujen validointi ja koko turvakerros testeineen.
 Mitä ei: agentti ei vastaa ilman `ANTHROPIC_API_KEY`:tä, eikä vektorihaku toimi
-ilman `VOYAGE_API_KEY`:tä. Kummastakin lisää kohdassa
+ilman `OPENAI_API_KEY`:tä. Kummastakin lisää kohdassa
 [Hakutilat](#hakutilat-vektori-ja-leksikaalinen).
 
 Avaimet mukaan:
 
 ```bash
-cp .env.example .env.local     # täytä ANTHROPIC_API_KEY ja VOYAGE_API_KEY
+cp .env.example .env.local     # täytä ANTHROPIC_API_KEY ja OPENAI_API_KEY
 npm run index                  # indeksoi tietopohja oikeilla upotuksilla
 npm run embed                  # esilaskee upotukset content/embeddings.json:iin
 npm run record                 # nauhoittaa /demo-reitin keskustelut
@@ -119,8 +125,8 @@ npm run eval                   # neljä mittaria, exit-koodi 1 jos jokin alittaa
 
 ### Hakutilat: vektori ja leksikaalinen
 
-Hakupolku valitaan `VOYAGE_API_KEY`:n mukaan ja loggataan käynnistyksessä
-(`[rag] mode=vector` tai `[rag] mode=lexical (ei VOYAGE_API_KEY)`).
+Hakupolku valitaan `OPENAI_API_KEY`:n mukaan ja loggataan käynnistyksessä
+(`[rag] mode=vector` tai `[rag] mode=lexical (ei OPENAI_API_KEY)`).
 
 Syy kahteen polkuun on konkreettinen. Katkelmien upotukset voi laskea etukäteen
 (`npm run embed` kirjoittaa ne tiedostoon `content/embeddings.json`), mutta
@@ -169,7 +175,7 @@ mallikutsua. Perustelu on kohdassa
 [Mitä ei ole toteutettu](#mitä-ei-ole-toteutettu).
 
 Täysi toiminnallisuus vaatii lisäksi `ANTHROPIC_API_KEY`:n ja
-`VOYAGE_API_KEY`:n, mutta silloin päätepiste on maksullinen ja auki, eikä
+`OPENAI_API_KEY`:n, mutta silloin päätepiste on maksullinen ja auki, eikä
 repossa ole nopeusrajoitusta.
 Aja `npm run setup` kerran paikallisesti Neonin URL:lla osoittaen, jotta skeema
 ja tietopohja ovat paikallaan. Muuta konfiguraatiota ei tarvita.
@@ -402,7 +408,7 @@ niitä**, ja korjaus on haussa (hybridihaku, pilkkominen) eikä luvun säätämi
 Kynnyksen viilaaminen päällekkäisillä jakaumilla on ylisovittamista testisettiin.
 
 **Vektoripolun arvo `0.35` on arvattu, ei mitattu.** Sitä ei ole kalibroitu
-voyage-3-lite-upotuksilla, koska kalibrointi vaatii `VOYAGE_API_KEY`:n. Se on siinä siksi, että jokin kynnys on parempi kuin
+OpenAI-upotuksilla, koska kalibrointi vaatii `OPENAI_API_KEY`:n. Se on siinä siksi, että jokin kynnys on parempi kuin
 ei kynnystä — ei siksi, että 0,35 olisi oikea luku. Sama lukee koodissa
 (`lib/rag/search.ts`), jotta lukija ei löydä väitettä vain toisesta paikasta.
 

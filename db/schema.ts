@@ -12,7 +12,7 @@ import {
 
 /**
  * Tietopohjan katkelmat. Yksi rivi = yksi haettava pala markdownia.
- * Upotus on 512-ulotteinen (voyage-3-lite). Jos vaihdat mallia, vaihda myös
+ * Upotus on 512-ulotteinen (OpenAI text-embedding-3-small, dimensions 512). Jos vaihdat mallia, vaihda myös
  * dimensio täällä ja aja migraatio — muuten haku palauttaa hiljaa roskaa.
  */
 export const chunks = pgTable(
