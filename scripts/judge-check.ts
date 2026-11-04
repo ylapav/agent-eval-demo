@@ -37,7 +37,7 @@ const PARIT: Pari[] = [
   {
     nimi: "1. täysin tuettu",
     vastaus:
-      "Kattopelleillä takuu on 20 vuotta ostopäivästä. Takuuaika lasketaan laskun päiväyksestä.",
+      "Kattopelleillä takuu on 20 vuotta. Takuuaika lasketaan laskun päiväyksestä.",
     katkelmat: [KATKELMA_TAKUU],
     odotus: (r) => r.total > 0 && r.unsupported.length === 0,
     selite: "jokainen väite löytyy katkelmasta sanatarkasti",
