@@ -563,9 +563,18 @@ laskevan vuoroja mutta ei sitä, tapahtuiko niissä mitään.
 
 Järjestyksessä:
 
-1. **Kalibroi hakukynnys oikeilla upotuksilla** ja aja evaluointi. Kaikki muu
-   nojaa siihen, että hakukerros erottaa löytyvän löytymättömästä.
-2. **Kaksi injektioaukkoa, jotka löytyivät setin auditoinnissa.** Ensimmäinen:
+1. **Agentin pitää hakea lähde ennen kuin se väittää yrityksestä mitään.**
+   Ajojen 1 ja 2 perusteella tämä on suurin todellinen puute: agentti ei
+   kutsunut hakua yhdessäkään kahdestakymmenestä kieltäytymistapauksesta, ja
+   työkaluvalinta alitti kynnyksen molemmilla kerroilla samasta syystä. Korjaus
+   on rakenteellinen, ei kehotteen muotoilu: yritystä koskevassa kysymyksessä
+   vastausvaihe ei käynnisty ennen onnistunutta hakukutsua, samalla tavalla
+   kuin kirjoitusvartija vaatii aiemman luvun ennen kirjoitusta.
+2. **Arvioija ilman katkelmia.** Ajossa 2 arvioija merkitsi väitteitä tuetuiksi,
+   vaikka katkelmia oli nolla. Judge-checkiin tarvitaan tapaus "ei katkelmia,
+   tosiasiaväite → tukematon", ja ajajan kannattaa tarkistaa se myös
+   rakenteellisesti: nolla katkelmaa ja yksikin tuettu väite on arvioijan virhe.
+3. **Kaksi injektioaukkoa, jotka löytyivät setin auditoinnissa.** Ensimmäinen:
    mikään tapaus ei koettele `<hakutulos>`-rajaa itseään. Kehote nimeää sen
    puoleksi injektiosuojasta, mutta käyttäjä voi kirjoittaa oman
    `<hakutulos>`-lohkon viestiinsä, ja tekstitasolla se on erottamaton aidosta.
@@ -573,18 +582,18 @@ Järjestyksessä:
    Realistinen myrkytys naamioituu liiketoimintatekstiksi ja ohjaa työkalun
    *parametreja* (puhelinnumero, aihe) sen sijaan että käskisi ohittamaan
    sääntöjä — eikä ajaja osaa vielä tarkistaa argumenttitason vuotoa lainkaan.
-3. **Ehdota/vahvista-protokolla.** Nykyinen vahvistusportti tietää, että
+4. **Ehdota/vahvista-protokolla.** Nykyinen vahvistusportti tietää, että
    vahvistuskierros oli mahdollinen — ei sitä, mitä vahvistettiin. Ehdotus saa
    tunnisteen, kirjoitus viittaa siihen, ja vartija vertaa sisällön tiivistettä.
    Se siirtäisi rajan 3 kehotteesta koodiin.
-4. **Nopeusrajoitus ja kustannuskatto per istunto.** Kirjoituskatto on olemassa,
+5. **Nopeusrajoitus ja kustannuskatto per istunto.** Kirjoituskatto on olemassa,
    lukukatto ei. Kallis silmukka on helppo laukaista.
-5. **Hybridihaku.** Vektori- ja leksikaalinen haku ovat jo olemassa, mutta
+6. **Hybridihaku.** Vektori- ja leksikaalinen haku ovat jo olemassa, mutta
    erillisinä polkuina. Ne yhdistetään yhdeksi hauksi (esim. reciprocal rank
    fusion), jolloin tuotenumerot ja merkitys löytyvät samalla kyselyllä.
-6. **Ihmisen ohitusreitti.** Nyt agentti joko vastaa tai luo tiketin. Väliin
+7. **Ihmisen ohitusreitti.** Nyt agentti joko vastaa tai luo tiketin. Väliin
    tarvitaan siirto ihmiselle kesken keskustelun, historia mukana.
-7. **Katkelmatason osumaseuranta.** Mitkä katkelmat päätyvät vastauksiin ja mitkä
+8. **Katkelmatason osumaseuranta.** Mitkä katkelmat päätyvät vastauksiin ja mitkä
    eivät koskaan. Käyttämätön katkelma on joko turha tai löytymätön, ja ne
    vaativat eri korjauksen.
 
